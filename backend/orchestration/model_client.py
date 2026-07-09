@@ -15,6 +15,7 @@ _TASK_MODELS = {
     "EXTRACT_CLAIMS": settings.llm_model,
     "VERIFY": settings.llm_fallback_model,
     "COMPOSE": settings.llm_model,
+    "RERANK": settings.llm_fallback_model,
 }
 
 
@@ -179,6 +180,12 @@ class ModelClient:
                 f"Decision: {inputs.get('decision')}\n"
                 f"Draft: {inputs.get('draft')}\n"
                 f"Verified claims: {inputs.get('verified_claims')}"
+            )
+        if task_type == "RERANK":
+            return (
+                f"Rank the candidate passages by how well they answer the query. "
+                f'Return JSON: {{"ranking": [source numbers, best first]}}.\n\n'
+                f"Query: {inputs.get('query')}\n\nCandidates:\n{inputs.get('candidates')}"
             )
         return json.dumps(inputs)
 

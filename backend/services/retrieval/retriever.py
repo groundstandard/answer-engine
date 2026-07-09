@@ -2,11 +2,13 @@ from uuid import UUID
 from typing import Optional, List
 from backend.models.evidence import EvidenceBundle, EvidenceItem
 from backend.models.classification import ClassificationResult
+from backend.config.settings import settings
 
 
 class RetrievalService:
     """
-    Hybrid retrieval: vector similarity + BM25 keyword search fused via RRF.
+    Hybrid retrieval: vector similarity + BM25 keyword search fused via RRF,
+    with an optional LLM-based rerank pass (ENABLE_RERANKER).
     """
 
     def __init__(self):
@@ -23,6 +25,10 @@ class RetrievalService:
         self.trust_filter = TrustFilter()
         self.freshness_filter = FreshnessFilter()
         self.query_rewriter = QueryRewriter()
+        self.reranker = None
+        if settings.ENABLE_RERANKER:
+            from backend.services.retrieval.reranker import Reranker
+            self.reranker = Reranker()
 
     async def retrieve_evidence(
         self,
@@ -56,6 +62,10 @@ class RetrievalService:
         fused = self.fuser.fuse(vector_results=vector_hits, bm25_results=bm25_hits, top_k=top_k)
         filtered = self.trust_filter.filter(fused)
         filtered = self.freshness_filter.filter(filtered)
+
+        # Optional LLM rerank pass over the surviving candidates.
+        if self.reranker and filtered:
+            filtered = await self.reranker.rerank(query, filtered, top_k=top_k)
 
         return EvidenceBundle(
             query_id=None,
