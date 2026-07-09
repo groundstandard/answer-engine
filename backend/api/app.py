@@ -1,15 +1,18 @@
 import logging
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from contextlib import asynccontextmanager
+
+_STATIC_DIR = Path(__file__).parent / "static"
 from backend.api.routes import query, documents, sources, feedback, evaluations, metrics, auth, admin
 from backend.api.middleware.rate_limiter import rate_limiter
 from backend.api.deps import require_auth
 from backend.database.connection import init_db
 from backend.config.settings import settings
 
-_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc")
+_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard")
 
 
 @asynccontextmanager
@@ -78,6 +81,10 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         return {"status": "ok", "version": "1.0.0"}
+
+    @app.get("/dashboard", include_in_schema=False)
+    async def dashboard():
+        return FileResponse(_STATIC_DIR / "dashboard.html")
 
     return app
 

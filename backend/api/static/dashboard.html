@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Answer Engine — Admin Dashboard</title>
+<style>
+  :root {
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --border:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --primary:#6366f1;
+    --green:#10b981; --amber:#f59e0b; --red:#ef4444;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex;
+           align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  header h1 { font-size:18px; margin:0; letter-spacing:-.3px; }
+  header .sub { color:var(--muted); font-size:13px; margin-top:2px; }
+  .tenant { display:flex; align-items:center; gap:8px; }
+  .tenant input { background:var(--panel); border:1px solid var(--border); color:var(--text);
+                  border-radius:8px; padding:8px 10px; width:320px; font-size:13px; font-family:monospace; }
+  main { padding:24px; max-width:1100px; margin:0 auto; display:grid; gap:20px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; }
+  .card .n { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+  .card .l { color:var(--muted); font-size:12px; margin-top:4px; text-transform:uppercase; letter-spacing:.5px; }
+  section.panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px; }
+  section.panel h2 { font-size:14px; margin:0 0 14px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  button { background:var(--primary); color:#fff; border:0; border-radius:8px; padding:8px 14px;
+           font-size:13px; font-weight:600; cursor:pointer; }
+  button.ghost { background:var(--panel2); }
+  button.sm { padding:5px 10px; font-size:12px; }
+  input.f, textarea.f { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
+                        border-radius:8px; padding:9px 11px; font-size:13px; font-family:inherit; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .list { display:grid; gap:8px; }
+  .item { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .item .meta { color:var(--muted); font-size:12px; margin-top:3px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+  .b-verified{background:rgba(16,185,129,.15);color:var(--green);}
+  .b-qualified{background:rgba(245,158,11,.15);color:var(--amber);}
+  .b-refused{background:rgba(239,68,68,.15);color:var(--red);}
+  .b-escalated{background:rgba(99,102,241,.15);color:var(--primary);}
+  .muted { color:var(--muted); font-size:13px; }
+  .answer { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px; margin-top:12px; }
+  .cite { font-size:12px; color:var(--muted); border-left:2px solid var(--border); padding-left:10px; margin-top:6px; }
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:760px){ .split{grid-template-columns:1fr;} .tenant input{width:200px;} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Answer Engine — Admin Dashboard</h1>
+    <div class="sub">Evidence-gated verification · metrics, sources, review queue, test console</div>
+  </div>
+  <div class="tenant">
+    <span class="muted">Tenant</span>
+    <input id="tenant" value="3aa67dce-9bbf-4a83-8d77-d461fabd6726" />
+    <button class="ghost sm" onclick="refreshAll()">Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div class="cards" id="metrics"></div>
+
+  <div class="split">
+    <section class="panel">
+      <h2>Ask (test query)</h2>
+      <textarea id="q" class="f" rows="3" placeholder="Ask a question against this tenant's evidence…"></textarea>
+      <div class="row" style="margin-top:10px"><button onclick="ask()">Submit query</button></div>
+      <div id="answer"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Sources</h2>
+      <div class="row" style="margin-bottom:10px">
+        <input id="srcName" class="f" style="flex:1" placeholder="Source name" />
+        <input id="srcTier" class="f" style="width:90px" type="number" min="1" max="5" value="3" title="trust tier 1-5" />
+        <button class="sm" onclick="addSource()">Add</button>
+      </div>
+      <div class="list" id="sources"><div class="muted">Loading…</div></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Review queue (pending)</h2>
+    <div class="list" id="reviews"><div class="muted">Loading…</div></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const tenant = () => $("tenant").value.trim();
+const badge = (d) => `<span class="badge b-${(d||'').toLowerCase()}">${d||'?'}</span>`;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const t = await r.text();
+  let j; try { j = JSON.parse(t); } catch { j = t; }
+  if (!r.ok) throw new Error((j && j.detail) || r.status);
+  return j;
+}
+
+async function loadMetrics() {
+  try {
+    const m = await api(`/v1/metrics?tenant_id=${tenant()}`);
+    $("metrics").innerHTML = [
+      ["Total queries", m.total_queries],
+      ["Verified", (m.verified_rate*100).toFixed(0)+"%"],
+      ["Qualified", (m.qualified_rate*100).toFixed(0)+"%"],
+      ["Refused", (m.refusal_rate*100).toFixed(0)+"%"],
+      ["Avg latency", Math.round(m.avg_latency_ms)+" ms"],
+    ].map(([l,n]) => `<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+  } catch(e){ $("metrics").innerHTML = `<div class="card"><div class="muted">Metrics unavailable: ${e.message}</div></div>`; }
+}
+
+async function loadSources() {
+  try {
+    const s = await api(`/v1/sources?tenant_id=${tenant()}`);
+    $("sources").innerHTML = s.length ? s.map(x =>
+      `<div class="item"><b>${x.source_name}</b> · tier ${x.trust_tier}
+       <div class="meta">${x.source_id}</div></div>`).join("")
+      : `<div class="muted">No sources yet.</div>`;
+  } catch(e){ $("sources").innerHTML = `<div class="muted">${e.message}</div>`; }
+}
+
+async function addSource() {
+  const name = $("srcName").value.trim(); if(!name) return;
+  try {
+    await api(`/v1/sources`, {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({tenant_id:tenant(), source_name:name, trust_tier:parseInt($("srcTier").value||"3")})});
+    $("srcName").value=""; loadSources();
+  } catch(e){ alert("Add source failed: "+e.message); }
+}
+
+async function loadReviews() {
+  try {
+    const rv = await api(`/v1/admin/reviews?tenant_id=${tenant()}&status=pending`);
+    $("reviews").innerHTML = rv.length ? rv.map(x =>
+      `<div class="item"><b>${x.query_text}</b>
+        <div class="meta">${x.reason||""} · ${x.created_at}</div>
+        <div class="row" style="margin-top:8px">
+          <button class="sm" onclick="resolve('${x.id}','resolved')">Resolve</button>
+          <button class="ghost sm" onclick="resolve('${x.id}','dismissed')">Dismiss</button>
+        </div></div>`).join("")
+      : `<div class="muted">No pending reviews.</div>`;
+  } catch(e){ $("reviews").innerHTML = `<div class="muted">${e.message}</div>`; }
+}
+
+async function resolve(id, status) {
+  try { await api(`/v1/admin/reviews/${id}/resolve`, {method:"POST",
+    headers:{"Content-Type":"application/json"}, body: JSON.stringify({status})}); loadReviews(); }
+  catch(e){ alert("Resolve failed: "+e.message); }
+}
+
+async function ask() {
+  const q = $("q").value.trim(); if(!q) return;
+  $("answer").innerHTML = `<div class="answer muted">Running the evidence-gated pipeline…</div>`;
+  try {
+    const r = await api(`/v1/query`, {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({query:q, tenant_id:tenant()})});
+    const cites = (r.citations||[]).map(c => `<div class="cite">${c.source_name}: ${c.snippet||""}</div>`).join("");
+    $("answer").innerHTML = `<div class="answer">${badge(r.final_decision)}
+      <div style="margin-top:8px">${r.response_text || r.refusal_reason || ""}</div>${cites}</div>`;
+    loadMetrics();
+  } catch(e){ $("answer").innerHTML = `<div class="answer muted">Error: ${e.message}</div>`; }
+}
+
+function refreshAll(){ loadMetrics(); loadSources(); loadReviews(); }
+refreshAll();
+</script>
+</body>
+</html>
