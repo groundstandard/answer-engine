@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     ENABLE_RERANKER: bool = False
     ENABLE_STREAMING: bool = False
 
+    # Cost optimization: route low-risk queries' generation tasks to the cheaper
+    # fallback model. Verification always stays on its configured model.
+    ENABLE_COST_ROUTING: bool = True
+    COST_ROUTING_RISK_THRESHOLD: float = 0.4
+
     LOG_LEVEL: str = "INFO"
     SENTRY_DSN: str = ""
 

@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 _STATIC_DIR = Path(__file__).parent / "static"
 from backend.api.routes import query, documents, sources, feedback, evaluations, metrics, auth, admin
 from backend.api.middleware.rate_limiter import rate_limiter
-from backend.api.deps import require_auth
+from backend.api.deps import require_auth, require_role
 from backend.database.connection import init_db
 from backend.config.settings import settings
 
@@ -75,8 +75,10 @@ def create_app() -> FastAPI:
     app.include_router(sources.router, prefix="/v1", tags=["Sources"], dependencies=guarded)
     app.include_router(feedback.router, prefix="/v1", tags=["Feedback"], dependencies=guarded)
     app.include_router(evaluations.router, prefix="/v1", tags=["Evaluations"], dependencies=guarded)
-    app.include_router(metrics.router, prefix="/v1", tags=["Metrics"], dependencies=guarded)
-    app.include_router(admin.router, prefix="/v1", tags=["Admin"], dependencies=guarded)
+    # Admin/analytics surfaces require an elevated role (when auth is enforced).
+    staff = [Depends(require_role("admin", "reviewer"))]
+    app.include_router(metrics.router, prefix="/v1", tags=["Metrics"], dependencies=staff)
+    app.include_router(admin.router, prefix="/v1", tags=["Admin"], dependencies=staff)
 
     @app.get("/health")
     async def health_check():

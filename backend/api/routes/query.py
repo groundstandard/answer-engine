@@ -1,8 +1,11 @@
+import asyncio
+import json
 import logging
 from functools import lru_cache
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from backend.api.schemas.query import QueryRequest, QueryResponse, QueryTraceResponse
 from backend.orchestration.pipeline import PipelineController
@@ -133,6 +136,56 @@ async def submit_query(request: QueryRequest):
         await _enqueue_review(query_id, request, final)
 
     return QueryResponse(**final.to_dict())
+
+
+@router.post("/query/stream")
+async def submit_query_stream(request: QueryRequest):
+    """
+    Same evidence-gated pipeline as /v1/query, but streams Server-Sent Events as
+    each stage completes: classification, retrieval, claims, verification, policy,
+    then a final event with the full response (PRD Phase 3).
+    """
+    query_id = uuid4()
+    profile, policy_config = await _resolve_policy(request)
+    overrides = await _resolve_model_overrides(request.tenant_id)
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def on_event(stage, data):
+        await queue.put((stage, data))
+
+    async def run():
+        token = MODEL_OVERRIDES.set(overrides)
+        try:
+            final = await get_pipeline().run_pipeline(
+                query=request.query, tenant_id=request.tenant_id, user_id=request.user_id,
+                policy_config=policy_config, source_scope=request.allowed_sources,
+                domain_hint=request.domain_hint, on_event=on_event,
+            )
+            final.query_id = query_id
+            await queue.put(("final", final.to_dict()))
+            await _log_query_trace(query_id, request, final, profile)
+            if final.final_decision == "ESCALATED":
+                await _enqueue_review(query_id, request, final)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Streaming pipeline failure for query %s", query_id)
+            await queue.put(("error", {"detail": str(e)}))
+        finally:
+            MODEL_OVERRIDES.reset(token)
+            await queue.put(None)
+
+    async def event_gen():
+        task = asyncio.create_task(run())
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                stage, data = item
+                yield f"event: {stage}\ndata: {json.dumps(data, default=str)}\n\n"
+        finally:
+            await task
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
 
 
 @router.get("/query/{query_id}", response_model=QueryTraceResponse)

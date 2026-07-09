@@ -1,6 +1,6 @@
 import logging
 from uuid import UUID
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -10,6 +10,11 @@ from backend.database.connection import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class SourceUsage(BaseModel):
+    source_name: str
+    citation_count: int
 
 
 class MetricsResponse(BaseModel):
@@ -72,3 +77,28 @@ async def get_metrics(tenant_id: Optional[UUID] = Query(None, description="Scope
         refusal_rate=rate("REFUSED"),
         avg_latency_ms=round(weighted_latency / total, 1) if total else 0.0,
     )
+
+
+@router.get("/metrics/sources", response_model=List[SourceUsage])
+async def source_analytics(tenant_id: Optional[UUID] = Query(None)):
+    """
+    Which sources actually contribute to answers — counts citations per source
+    across logged query traces (PRD Phase 3: per-source retrieval analytics).
+    """
+    where = "WHERE tenant_id = :tenant_id" if tenant_id else ""
+    sql = f"""
+        SELECT c->>'source_name' AS source_name, COUNT(*) AS citation_count
+        FROM query_logs,
+             LATERAL jsonb_array_elements(trace->'final_response'->'citations') AS c
+        {where}
+        GROUP BY c->>'source_name'
+        ORDER BY citation_count DESC
+        LIMIT 100
+    """
+    params = {"tenant_id": str(tenant_id)} if tenant_id else {}
+    try:
+        async with AsyncSessionLocal() as session:
+            rows = (await session.execute(text(sql), params)).fetchall()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Analytics store unavailable: {e}")
+    return [SourceUsage(source_name=r.source_name or "unknown", citation_count=int(r.citation_count)) for r in rows]

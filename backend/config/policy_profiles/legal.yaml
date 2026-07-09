@@ -1,0 +1,14 @@
+profile: legal
+description: Legal domain profile — strict support, exact citations, escalate on conflict
+
+minimum_evidence_count: 3
+minimum_trust_score: 0.82
+minimum_freshness_score: 0.75
+minimum_claim_support_ratio: 0.96
+qualified_claim_support_floor: 0.82
+max_contradicted_claim_ratio: 0.02
+require_exact_citation_for_high_risk: true
+allow_inferred_support: false
+refusal_on_missing_critical_claim: true
+escalate_on_authoritative_conflict: true
+high_risk_support_ratio_override: 0.98

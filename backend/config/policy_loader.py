@@ -21,9 +21,10 @@ _VALID_FIELDS = {f.name for f in fields(PolicyConfig)}
 _DOMAIN_PROFILE_MAP = {
     "medical": "medical",
     "health": "medical",
-    "legal": "high_risk",
-    "financial": "high_risk",
-    "finance": "high_risk",
+    "legal": "legal",
+    "law": "legal",
+    "financial": "financial",
+    "finance": "financial",
 }
 
 
