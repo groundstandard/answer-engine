@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.api.schemas.query import QueryRequest, QueryResponse, QueryTraceResponse
 from backend.orchestration.pipeline import PipelineController
+from backend.orchestration.model_client import MODEL_OVERRIDES
 from backend.config.policy_loader import load_policy_config, resolve_profile_for_domain
 from backend.database.connection import AsyncSessionLocal
 from backend.database.repositories.query_repo import QueryRepository
@@ -43,6 +44,16 @@ async def _resolve_policy(request: QueryRequest):
     if cfg_tenant.minimum_claim_support_ratio >= cfg_domain.minimum_claim_support_ratio:
         return tenant_profile, cfg_tenant
     return domain_profile, cfg_domain
+
+
+async def _resolve_model_overrides(tenant_id) -> dict:
+    """Best-effort load of the tenant's per-task model overrides."""
+    try:
+        async with AsyncSessionLocal() as session:
+            return await TenantRepository(session).get_model_overrides(tenant_id)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Model-override lookup skipped (DB unavailable): %s", e)
+        return {}
 
 
 async def _log_query_trace(query_id, req: QueryRequest, response, profile: str) -> None:
@@ -94,7 +105,9 @@ async def submit_query(request: QueryRequest):
     """
     query_id = uuid4()
     profile, policy_config = await _resolve_policy(request)
+    overrides = await _resolve_model_overrides(request.tenant_id)
 
+    token = MODEL_OVERRIDES.set(overrides)
     try:
         final = await get_pipeline().run_pipeline(
             query=request.query,
@@ -108,6 +121,8 @@ async def submit_query(request: QueryRequest):
         # PRD 3.1: never a silent fallback — surface a structured 5xx.
         logger.exception("Pipeline failure for query %s", query_id)
         raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
+    finally:
+        MODEL_OVERRIDES.reset(token)
 
     # Use one consistent id for the response and its trace record.
     final.query_id = query_id

@@ -1,0 +1,9 @@
+{
+  "name": "factual",
+  "description": "Answerable factual queries. Expect VERIFIED when supporting evidence is indexed.",
+  "cases": [
+    { "id": "bjj-first-rank", "query": "What is the first rank in Brazilian Jiu-Jitsu?", "expected_decision": "VERIFIED" },
+    { "id": "bjj-black-belt-time", "query": "How long does it typically take to earn a BJJ black belt?", "expected_decision": "VERIFIED" },
+    { "id": "bjj-focus", "query": "What does Brazilian Jiu-Jitsu focus on?", "expected_decision": "VERIFIED" }
+  ]
+}

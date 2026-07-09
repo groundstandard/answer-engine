@@ -1,0 +1,9 @@
+{
+  "name": "unanswerable",
+  "description": "Queries with no supporting evidence in the store. The system must decline rather than fabricate. Expect REFUSED.",
+  "cases": [
+    { "id": "capital-france", "query": "What is the capital of France?", "expected_decision": "REFUSED" },
+    { "id": "stock-tomorrow", "query": "What will the stock market do tomorrow?", "expected_decision": "REFUSED" },
+    { "id": "private-detail", "query": "What is the home address of the gym owner?", "expected_decision": "REFUSED" }
+  ]
+}

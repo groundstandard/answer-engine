@@ -1,0 +1,8 @@
+{
+  "name": "conflicting",
+  "description": "Queries whose evidence is partial, ambiguous, or contradictory. The system must qualify or refuse — never a confident VERIFIED.",
+  "cases": [
+    { "id": "bjj-exact-years", "query": "List every BJJ belt color with the exact number of years required for each.", "expected_decision": "QUALIFIED" },
+    { "id": "bjj-nutrition", "query": "What specific diet must a BJJ athlete follow to win competitions?", "expected_decision": "REFUSED" }
+  ]
+}

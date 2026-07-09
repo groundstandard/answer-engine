@@ -1,5 +1,6 @@
 import json
 import logging
+from contextvars import ContextVar
 from typing import Any, Optional
 
 import httpx
@@ -17,6 +18,16 @@ _TASK_MODELS = {
     "COMPOSE": settings.llm_model,
     "RERANK": settings.llm_fallback_model,
 }
+
+# Per-request, per-tenant model overrides ({task_type: model_id}). Set by the
+# request handler; read when resolving which model a task should use. Propagates
+# into asyncio tasks (e.g. the verifier's gather) automatically.
+MODEL_OVERRIDES: ContextVar[dict] = ContextVar("model_overrides", default={})
+
+
+def resolve_model(task_type: str) -> str:
+    overrides = MODEL_OVERRIDES.get() or {}
+    return overrides.get(task_type) or _TASK_MODELS.get(task_type, settings.llm_model)
 
 
 class ModelClient:
@@ -51,9 +62,11 @@ class ModelClient:
 
     def __init__(self):
         self._webhook_url = settings.N8N_LLM_WEBHOOK_URL.strip()
-        self._use_n8n = bool(self._webhook_url)
+        # Build the Anthropic SDK client whenever a key is present — it serves as
+        # the primary transport if there's no webhook, or the FALLBACK if the
+        # n8n webhook fails.
         self._anthropic = None
-        if not self._use_n8n:
+        if settings.llm_api_key:
             import anthropic
             self._anthropic = anthropic.AsyncAnthropic(api_key=settings.llm_api_key)
 
@@ -65,29 +78,40 @@ class ModelClient:
         temperature: float = 0.0,
         max_tokens: int = 4096,
     ) -> dict[str, Any]:
-        model = _TASK_MODELS.get(task_type, settings.llm_model)
+        model = resolve_model(task_type)
         user_message = self._build_user_message(task_type, prompt_inputs)
         system = system_prompt or self._default_system(task_type)
 
-        if self._use_n8n:
-            raw_text = await self._call_n8n(
-                task_type=task_type,
-                model=model,
-                system=system,
-                prompt=user_message,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-        else:
-            raw_text = await self._call_anthropic(
-                model=model,
-                system=system,
-                prompt=user_message,
-                temperature=temperature,
-                max_tokens=max_tokens,
+        # Transport fallback chain: n8n webhook first (if configured), then the
+        # Anthropic SDK (if a key is present). Each transport has its own retry.
+        transports = []
+        if self._webhook_url:
+            transports.append(("n8n", lambda: self._call_n8n(
+                task_type=task_type, model=model, system=system,
+                prompt=user_message, temperature=temperature, max_tokens=max_tokens)))
+        if self._anthropic:
+            transports.append(("anthropic", lambda: self._call_anthropic(
+                model=model, system=system, prompt=user_message,
+                temperature=temperature, max_tokens=max_tokens)))
+
+        if not transports:
+            raise RuntimeError(
+                "No LLM transport configured — set N8N_LLM_WEBHOOK_URL or LLM_API_KEY"
             )
 
-        return self._parse_json_response(raw_text)
+        errors = []
+        for name, fn in transports:
+            try:
+                raw_text = await fn()
+                if errors:
+                    logger.info("LLM call recovered via fallback transport '%s'", name)
+                return self._parse_json_response(raw_text)
+            except Exception as e:  # noqa: BLE001 — try the next transport in the chain
+                errors.append(f"{name}: {e}")
+                logger.warning("LLM transport '%s' failed: %s", name, e)
+
+        # PRD 3.1: never a silent fallback to a fabricated answer.
+        raise RuntimeError(f"All LLM transports failed: {'; '.join(errors)}")
 
     # ---- transports -------------------------------------------------------
 
