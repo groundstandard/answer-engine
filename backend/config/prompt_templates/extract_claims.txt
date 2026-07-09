@@ -1,0 +1,16 @@
+Extract all verifiable factual claims from the draft answer below.
+A "claim" is any assertion of fact that can be independently verified.
+Mark a claim as critical if it is the central assertion that must be true for the answer to be correct.
+
+Draft answer: {draft_answer}
+Original query: {query_context}
+
+Return JSON:
+{
+  "claims": [
+    {"text": "Exact claim text", "is_critical": true},
+    {"text": "Another claim", "is_critical": false}
+  ]
+}
+
+Return valid JSON only. No explanation.

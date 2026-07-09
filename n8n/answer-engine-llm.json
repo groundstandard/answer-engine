@@ -1,0 +1,71 @@
+{
+  "name": "Answer Engine — LLM",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "answer-engine-llm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-680, 0],
+      "id": "b2000000-0000-0000-0000-000000000001",
+      "name": "Webhook",
+      "webhookId": "answer-engine-llm-webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.prompt }}",
+        "options": {
+          "systemMessage": "={{ $json.body.system }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [-440, 0],
+      "id": "b2000000-0000-0000-0000-000000000002",
+      "name": "LLM Agent"
+    },
+    {
+      "parameters": {
+        "model": { "__rl": true, "value": "gpt-4o-mini", "mode": "list", "cachedResultName": "gpt-4o-mini" },
+        "options": { "temperature": 0 }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [-440, 200],
+      "id": "b2000000-0000-0000-0000-000000000003",
+      "name": "OpenAI Chat Model",
+      "credentials": { "openAiApi": { "id": "XK8rP9sQUaUTSp4n", "name": "OpenAi account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The Answer Engine expects { \"text\": \"<model output>\" }.\n// The AI Agent puts the model's answer in $json.output.\nconst r = $json || {};\nconst text = (r.output ?? r.text ?? '').toString();\nreturn [{ json: { text } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-160, 0],
+      "id": "b2000000-0000-0000-0000-000000000004",
+      "name": "Build Response"
+    },
+    {
+      "parameters": { "respondWith": "firstIncomingItem", "options": {} },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [80, 0],
+      "id": "b2000000-0000-0000-0000-000000000005",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "LLM Agent", "type": "main", "index": 0 }]] },
+    "OpenAI Chat Model": { "ai_languageModel": [[{ "node": "LLM Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "LLM Agent": { "main": [[{ "node": "Build Response", "type": "main", "index": 0 }]] },
+    "Build Response": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": true }
+}

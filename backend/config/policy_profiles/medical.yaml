@@ -1,0 +1,14 @@
+profile: medical
+description: Medical domain profile — hardest thresholds, always escalate on conflict
+
+minimum_evidence_count: 4
+minimum_trust_score: 0.85
+minimum_freshness_score: 0.80
+minimum_claim_support_ratio: 0.97
+qualified_claim_support_floor: 0.85
+max_contradicted_claim_ratio: 0.01
+require_exact_citation_for_high_risk: true
+allow_inferred_support: false
+refusal_on_missing_critical_claim: true
+escalate_on_authoritative_conflict: true
+high_risk_support_ratio_override: 0.99

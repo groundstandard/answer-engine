@@ -1,0 +1,15 @@
+Compose the final response based on the policy decision and verified claims.
+Your response must be accurate, clear, and include only what was verified.
+
+Policy decision: {decision}
+Draft answer: {draft}
+Verified claims: {verified_claims}
+
+Return JSON:
+{
+  "response_text": "Final, user-facing response text with inline [Source N] citations.",
+  "uncertainty_notes": ["List of caveats, gaps, or areas where evidence was partial. Empty list if none."]
+}
+
+If the decision is QUALIFIED, add appropriate hedging language.
+Return valid JSON only.

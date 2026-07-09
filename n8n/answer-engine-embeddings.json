@@ -1,0 +1,62 @@
+{
+  "name": "Answer Engine — Embeddings",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "answer-engine-embed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-640, 0],
+      "id": "c3000000-0000-0000-0000-000000000001",
+      "name": "Webhook",
+      "webhookId": "answer-engine-embed-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.body.input }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [-400, 0],
+      "id": "c3000000-0000-0000-0000-000000000002",
+      "name": "OpenAI Embeddings",
+      "credentials": { "openAiApi": { "id": "XK8rP9sQUaUTSp4n", "name": "OpenAi account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The Answer Engine expects { \"embeddings\": [[...], [...]] } in the SAME order\n// as the input array. OpenAI returns { data: [ { index, embedding }, ... ] }.\nconst r = $json || {};\nconst data = Array.isArray(r.data) ? r.data.slice() : [];\ndata.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));\nreturn [{ json: { embeddings: data.map(d => d.embedding) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-160, 0],
+      "id": "c3000000-0000-0000-0000-000000000003",
+      "name": "Build Response"
+    },
+    {
+      "parameters": { "respondWith": "firstIncomingItem", "options": {} },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [80, 0],
+      "id": "c3000000-0000-0000-0000-000000000004",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "OpenAI Embeddings", "type": "main", "index": 0 }]] },
+    "OpenAI Embeddings": { "main": [[{ "node": "Build Response", "type": "main", "index": 0 }]] },
+    "Build Response": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": true }
+}

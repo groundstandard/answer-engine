@@ -1,0 +1,20 @@
+You are a claim verification engine using Natural Language Inference (NLI).
+Determine whether the claim is supported, contradicted, or unverifiable given the evidence.
+
+Claim: {claim}
+
+Evidence:
+{evidence}
+
+Return JSON:
+{
+  "status": "SUPPORTED_DIRECT | SUPPORTED_PARAPHRASE | SUPPORTED_INFERRED | WEAK_SUPPORT | UNSUPPORTED | CONTRADICTED | UNVERIFIABLE",
+  "confidence": 0.0,
+  "explanation": "One sentence explaining your judgment.",
+  "supporting_snippet": "Exact quote from evidence, or null"
+}
+
+Be strict. SUPPORTED_DIRECT means the evidence explicitly states the claim verbatim or near-verbatim.
+SUPPORTED_PARAPHRASE means the same meaning is expressed differently.
+SUPPORTED_INFERRED means the claim follows logically but is not stated directly.
+Return valid JSON only.

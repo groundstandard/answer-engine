@@ -1,0 +1,14 @@
+profile: high_risk
+description: Strict profile for high-stakes queries (legal, financial decisions)
+
+minimum_evidence_count: 3
+minimum_trust_score: 0.80
+minimum_freshness_score: 0.70
+minimum_claim_support_ratio: 0.95
+qualified_claim_support_floor: 0.80
+max_contradicted_claim_ratio: 0.02
+require_exact_citation_for_high_risk: true
+allow_inferred_support: false
+refusal_on_missing_critical_claim: true
+escalate_on_authoritative_conflict: true
+high_risk_support_ratio_override: 0.98

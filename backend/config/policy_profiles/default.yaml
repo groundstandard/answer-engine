@@ -1,0 +1,14 @@
+profile: default
+description: Standard profile for general-purpose queries
+
+minimum_evidence_count: 2
+minimum_trust_score: 0.60
+minimum_freshness_score: 0.50
+minimum_claim_support_ratio: 0.90
+qualified_claim_support_floor: 0.60
+max_contradicted_claim_ratio: 0.05
+require_exact_citation_for_high_risk: true
+allow_inferred_support: false
+refusal_on_missing_critical_claim: true
+escalate_on_authoritative_conflict: true
+high_risk_support_ratio_override: 0.95
