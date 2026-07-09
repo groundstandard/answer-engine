@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
 
+    # When True, all /v1 routes require a valid Bearer token. Default False so
+    # local/dev + internal use works without tokens; flip on for external beta.
+    AUTH_REQUIRED: bool = False
+    # If set, minting a token via /v1/auth/token requires this shared key in
+    # the X-Service-Key header (prevents anyone issuing tenant tokens).
+    SERVICE_KEY: str = ""
+
     RATE_LIMIT_PER_MINUTE: int = 60
 
     RETRIEVAL_TOP_K: int = 20

@@ -9,6 +9,8 @@ from backend.orchestration.pipeline import PipelineController
 from backend.config.policy_loader import load_policy_config, resolve_profile_for_domain
 from backend.database.connection import AsyncSessionLocal
 from backend.database.repositories.query_repo import QueryRepository
+from backend.database.repositories.tenant_repo import TenantRepository
+from backend.database.repositories.review_repo import ReviewRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -18,6 +20,29 @@ router = APIRouter()
 def get_pipeline() -> PipelineController:
     """Single shared pipeline instance (builds model client + services once)."""
     return PipelineController()
+
+
+async def _resolve_policy(request: QueryRequest):
+    """
+    Pick the effective policy: the tenant's configured profile (from DB) vs the
+    profile implied by the query domain — whichever is STRICTER wins, so a
+    high-risk domain can never be answered under a lax tenant policy.
+    """
+    domain_profile = resolve_profile_for_domain(request.domain_hint)
+    tenant_profile = "default"
+    try:
+        async with AsyncSessionLocal() as session:
+            tp = await TenantRepository(session).get_policy_profile(request.tenant_id)
+            if tp:
+                tenant_profile = tp
+    except Exception as e:  # noqa: BLE001 — tenant lookup is best-effort
+        logger.warning("Tenant policy lookup skipped (DB unavailable): %s", e)
+
+    cfg_tenant = load_policy_config(tenant_profile)
+    cfg_domain = load_policy_config(domain_profile)
+    if cfg_tenant.minimum_claim_support_ratio >= cfg_domain.minimum_claim_support_ratio:
+        return tenant_profile, cfg_tenant
+    return domain_profile, cfg_domain
 
 
 async def _log_query_trace(query_id, req: QueryRequest, response, profile: str) -> None:
@@ -47,6 +72,20 @@ async def _log_query_trace(query_id, req: QueryRequest, response, profile: str) 
         logger.warning("Query trace logging skipped (DB unavailable): %s", e)
 
 
+async def _enqueue_review(query_id, req: QueryRequest, response) -> None:
+    """Best-effort: push an escalated query into the human review queue."""
+    try:
+        async with AsyncSessionLocal() as session:
+            await ReviewRepository(session).enqueue(
+                tenant_id=req.tenant_id,
+                query_text=req.query,
+                reason=response.refusal_reason or response.confidence_summary,
+                query_log_id=query_id,
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Review enqueue skipped (DB unavailable): %s", e)
+
+
 @router.post("/query", response_model=QueryResponse, status_code=200)
 async def submit_query(request: QueryRequest):
     """
@@ -54,8 +93,7 @@ async def submit_query(request: QueryRequest):
     Returns VERIFIED, QUALIFIED, or REFUSED response with citations.
     """
     query_id = uuid4()
-    profile = resolve_profile_for_domain(request.domain_hint)
-    policy_config = load_policy_config(profile)
+    profile, policy_config = await _resolve_policy(request)
 
     try:
         final = await get_pipeline().run_pipeline(
@@ -74,6 +112,10 @@ async def submit_query(request: QueryRequest):
     # Use one consistent id for the response and its trace record.
     final.query_id = query_id
     await _log_query_trace(query_id, request, final, profile)
+
+    # Escalated answers go to the human review queue (best-effort).
+    if final.final_decision == "ESCALATED":
+        await _enqueue_review(query_id, request, final)
 
     return QueryResponse(**final.to_dict())
 
