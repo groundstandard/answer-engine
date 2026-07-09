@@ -43,7 +43,7 @@ class QueryRepository:
                 "latency_ms": latency_ms,
                 "model_calls": model_calls,
                 "tokens_used": tokens_used,
-                "trace": json.dumps(trace) if trace is not None else None,
+                "trace": json.dumps(trace, default=str) if trace is not None else None,
             },
         )
         await self.db.commit()
