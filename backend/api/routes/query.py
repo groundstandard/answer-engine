@@ -15,6 +15,7 @@ from backend.database.connection import AsyncSessionLocal
 from backend.database.repositories.query_repo import QueryRepository
 from backend.database.repositories.tenant_repo import TenantRepository
 from backend.database.repositories.review_repo import ReviewRepository
+from backend.database.repositories.audit_repo import AuditRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -86,6 +87,21 @@ async def _log_query_trace(query_id, req: QueryRequest, response, profile: str) 
         logger.warning("Query trace logging skipped (DB unavailable): %s", e)
 
 
+async def _write_audit(query_id, req: QueryRequest, response) -> None:
+    """Best-effort append to the immutable audit log."""
+    try:
+        async with AsyncSessionLocal() as session:
+            await AuditRepository(session).write(
+                event_type="query",
+                tenant_id=req.tenant_id,
+                query_id=query_id,
+                decision=response.final_decision,
+                detail={"latency_ms": response.latency_ms, "citations": len(response.citations)},
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Audit write skipped (DB unavailable): %s", e)
+
+
 async def _enqueue_review(query_id, req: QueryRequest, response) -> None:
     """Best-effort: push an escalated query into the human review queue."""
     try:
@@ -130,6 +146,7 @@ async def submit_query(request: QueryRequest):
     # Use one consistent id for the response and its trace record.
     final.query_id = query_id
     await _log_query_trace(query_id, request, final, profile)
+    await _write_audit(query_id, request, final)
 
     # Escalated answers go to the human review queue (best-effort).
     if final.final_decision == "ESCALATED":
@@ -164,6 +181,7 @@ async def submit_query_stream(request: QueryRequest):
             final.query_id = query_id
             await queue.put(("final", final.to_dict()))
             await _log_query_trace(query_id, request, final, profile)
+            await _write_audit(query_id, request, final)
             if final.final_decision == "ESCALATED":
                 await _enqueue_review(query_id, request, final)
         except Exception as e:  # noqa: BLE001

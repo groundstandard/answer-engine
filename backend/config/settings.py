@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     LLM_MODEL: str = "claude-sonnet-4-5-20251001"
     LLM_FALLBACK_MODEL: str = "claude-haiku-4-5-20251001"
+    # Optional per-task specialized-model routing, e.g.
+    # TASK_MODELS='{"VERIFY":"my-nli-model","RERANK":"my-rerank-model"}'
+    TASK_MODELS: dict = {}
 
     # n8n webhook routing — when set, all model/embedding calls go through Bobby's
     # n8n workflows (credentials stay in n8n). Empty = fall back to direct SDK.

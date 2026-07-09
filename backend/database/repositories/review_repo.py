@@ -47,12 +47,24 @@ class ReviewRepository:
         rows = (await self.db.execute(text(sql), params)).fetchall()
         return [dict(r._mapping) for r in rows]
 
+    async def assign(self, review_id: UUID, reviewer_id: UUID) -> bool:
+        result = await self.db.execute(
+            text("""
+                UPDATE review_queue
+                SET status = 'in_review', assigned_to = :reviewer
+                WHERE id = :id AND status IN ('pending', 'in_review')
+            """),
+            {"id": str(review_id), "reviewer": str(reviewer_id)},
+        )
+        await self.db.commit()
+        return result.rowcount > 0
+
     async def resolve(self, review_id: UUID, status: str, note: Optional[str]) -> bool:
         result = await self.db.execute(
             text("""
                 UPDATE review_queue
                 SET status = :status, resolution_note = :note, resolved_at = NOW()
-                WHERE id = :id AND status = 'pending'
+                WHERE id = :id AND status IN ('pending', 'in_review')
             """),
             {"id": str(review_id), "status": status, "note": note},
         )

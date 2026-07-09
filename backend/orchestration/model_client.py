@@ -18,6 +18,8 @@ _TASK_MODELS = {
     "COMPOSE": settings.llm_model,
     "RERANK": settings.llm_fallback_model,
 }
+# Ops can pin specialized models per task via settings.TASK_MODELS.
+_TASK_MODELS.update(settings.TASK_MODELS or {})
 
 # Per-request, per-tenant model overrides ({task_type: model_id}). Set by the
 # request handler; read when resolving which model a task should use. Propagates
