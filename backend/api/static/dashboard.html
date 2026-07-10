@@ -272,6 +272,14 @@
         <div class="desc" style="margin-top:16px">The developer sends header <code class="inl2">X-API-Key: ae_…</code> to
           <code class="inl2">/v1/…</code>. Full examples in the <a href="/guide" target="_blank" style="color:var(--blue)">Integration Guide</a>.</div>
       </section>
+      <section class="panel" style="margin-top:18px">
+        <h2>Issued keys</h2>
+        <div class="desc">Who has access. The key itself is never stored — revoke to cut access instantly.</div>
+        <div style="overflow-x:auto;margin-top:6px"><table class="tbl">
+          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Created</th><th>Expires</th><th>Last used</th><th></th></tr></thead>
+          <tbody id="keysBody"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+        </table></div>
+      </section>
     </div>
 
     <!-- Reviews -->
@@ -332,6 +340,7 @@ function showView(t){
   document.querySelectorAll('.view').forEach(v=>{ v.hidden = (v.id !== 'view-'+t); });
   document.querySelectorAll('#nav a').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
   if(t==='queries')loadQueries();
+  if(t==='keys')loadKeys();
 }
 document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>showView(a.dataset.t));
 // Auth (used only when the server runs with AUTH_REQUIRED=true).
@@ -425,10 +434,36 @@ async function mintKey(){
         <button class="sm" onclick="copyKey()">Copy</button></div>
       <div class="muted" style="margin-top:8px">Give this to the developer. They send it as <code class="inl2">X-API-Key</code>.</div>
     </div>`;
-    $("keyName").value="";toast("Key generated","ok");
+    $("keyName").value="";toast("Key generated","ok");loadKeys();
   }catch(e){toast("Failed: "+e.message,"err");}
 }
 function copyKey(){const v=$("newKeyVal").textContent;navigator.clipboard.writeText(v).then(()=>toast("Key copied","ok"));}
+const fdate=(s)=>s?String(s).slice(0,10):'—';
+async function loadKeys(){
+  try{const ks=await api(`/v1/admin/api-keys?tenant_id=${tenant()}`);
+    $("keysBody").innerHTML=ks.length?ks.map(k=>{
+      const st=!k.is_active?`<span class="badge b-refused">revoked</span>`
+        :(k.expires_at&&new Date(k.expires_at)<new Date())?`<span class="badge b-qualified">expired</span>`
+        :`<span class="badge b-verified">active</span>`;
+      const canRevoke=k.is_active;
+      return `<tr>
+        <td class="q">${esc(k.name)||'<span class="muted">(unnamed)</span>'}</td>
+        <td class="muted">${k.role}</td>
+        <td>${st}</td>
+        <td class="muted">${fdate(k.created_at)}</td>
+        <td class="muted">${k.expires_at?fdate(k.expires_at):'never'}</td>
+        <td class="muted">${k.last_used_at?fdate(k.last_used_at):'—'}</td>
+        <td>${canRevoke?`<button class="sm" style="background:var(--red-bg);color:var(--red)" onclick="revokeKey('${k.id}')">Revoke</button>`:''}</td>
+      </tr>`;}).join("")
+      :`<tr><td colspan="7" class="muted">No keys yet.</td></tr>`;
+  }catch(e){$("keysBody").innerHTML=`<tr><td colspan="7" class="muted">${e.message}</td></tr>`;}
+}
+async function revokeKey(id){
+  if(!(await confirmModal("Revoke this key? The app/user using it loses access immediately.",{title:"Revoke key",okLabel:"Revoke",danger:true})))return;
+  try{await api(`/v1/admin/api-keys/${id}/revoke?tenant_id=${tenant()}`,{method:"POST"});
+    toast("Key revoked","ok");loadKeys();}
+  catch(e){toast("Failed: "+e.message,"err");}
+}
 async function resolve(id,status){try{await api(`/v1/admin/reviews/${id}/resolve`,{method:"POST",
   headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});toast("Review "+status,"ok");loadReviews();}catch(e){toast(e.message,"err");}}
 const STEPS=[["classification","Classify"],["retrieval","Retrieve"],["claims","Extract claims"],
@@ -483,6 +518,7 @@ function startAuto(){
     if(t==='sources')loadSources();
     else if(t==='reviews')loadReviews();
     else if(t==='queries')loadQueries();
+    else if(t==='keys')loadKeys();
   }, 7000);
 }
 function boot(){renderChips();refreshAll();startAuto();}

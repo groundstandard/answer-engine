@@ -42,6 +42,30 @@ class ApiKeyRepository:
         await self.db.commit()
         return key_id, raw
 
+    async def list_for_tenant(self, tenant_id: UUID) -> list[dict]:
+        """List key metadata for a tenant (never the key/hash), newest first."""
+        result = await self.db.execute(
+            text("""
+                SELECT id, name, role, is_active, created_at, last_used_at, expires_at
+                FROM api_keys WHERE tenant_id = :tid
+                ORDER BY created_at DESC
+            """),
+            {"tid": str(tenant_id)},
+        )
+        return [dict(r._mapping) for r in result.fetchall()]
+
+    async def revoke(self, key_id: UUID, tenant_id: UUID) -> bool:
+        """Deactivate a key (immediate). Returns True if a key was revoked."""
+        result = await self.db.execute(
+            text("""
+                UPDATE api_keys SET is_active = FALSE
+                WHERE id = :id AND tenant_id = :tid AND is_active = TRUE
+            """),
+            {"id": str(key_id), "tid": str(tenant_id)},
+        )
+        await self.db.commit()
+        return result.rowcount > 0
+
     async def verify(self, raw_key: str) -> Optional[dict]:
         """Resolve an active, non-expired key to {tenant_id, role}, or None."""
         result = await self.db.execute(

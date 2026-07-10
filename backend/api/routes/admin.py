@@ -176,6 +176,39 @@ async def mint_api_key(body: NewKeyRequest):
     }
 
 
+@router.get("/admin/api-keys", dependencies=[Depends(require_role("admin"))])
+async def list_api_keys(tenant_id: UUID = Query(...)):
+    """Admin-only: list issued keys for a tenant (metadata only, never the key)."""
+    try:
+        async with AsyncSessionLocal() as session:
+            rows = await ApiKeyRepository(session).list_for_tenant(tenant_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Key store unavailable: {e}")
+    return [
+        {
+            "id": str(r["id"]), "name": r["name"], "role": r["role"],
+            "is_active": r["is_active"],
+            "created_at": str(r["created_at"]),
+            "last_used_at": str(r["last_used_at"]) if r["last_used_at"] else None,
+            "expires_at": str(r["expires_at"]) if r["expires_at"] else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/admin/api-keys/{key_id}/revoke", dependencies=[Depends(require_role("admin"))])
+async def revoke_api_key(key_id: UUID, tenant_id: UUID = Query(...)):
+    """Admin-only: immediately deactivate a key."""
+    try:
+        async with AsyncSessionLocal() as session:
+            ok = await ApiKeyRepository(session).revoke(key_id, tenant_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Key store unavailable: {e}")
+    if not ok:
+        raise HTTPException(status_code=404, detail="Active key not found")
+    return {"id": str(key_id), "status": "revoked"}
+
+
 @router.post("/admin/freshness/scan")
 async def run_freshness_scan():
     """Run the freshness monitor once now and record FRESHNESS_SCAN audit entries
