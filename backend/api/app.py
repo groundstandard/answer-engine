@@ -14,7 +14,7 @@ from backend.api.deps import require_auth, require_role
 from backend.database.connection import init_db
 from backend.config.settings import settings
 
-_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard", "/static")
+_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard", "/guide", "/static")
 
 
 @asynccontextmanager
@@ -59,7 +59,13 @@ def create_app() -> FastAPI:
     _setup_observability()
     app = FastAPI(
         title="Evidence-Gated AI System",
-        description="Reliability gateway that enforces evidence verification before any LLM response reaches a user.",
+        description=(
+            "Reliability gateway that enforces evidence verification before any LLM "
+            "response reaches a user.\n\n"
+            "📘 **[Open the Integration Guide →](/guide)** — how to connect your app "
+            "(auth, examples, response states).  •  "
+            "📊 **[Admin Dashboard →](/dashboard)**"
+        ),
         version="1.0.0",
         lifespan=lifespan,
         docs_url=None,   # replaced by a branded custom /docs below
@@ -107,6 +113,10 @@ def create_app() -> FastAPI:
     @app.get("/dashboard", include_in_schema=False)
     async def dashboard():
         return FileResponse(_STATIC_DIR / "dashboard.html", headers={"Cache-Control": "no-store"})
+
+    @app.get("/guide", include_in_schema=False)
+    async def guide():
+        return FileResponse(_STATIC_DIR / "guide.html", headers={"Cache-Control": "no-store"})
 
     @app.get("/docs", include_in_schema=False)
     async def custom_docs():

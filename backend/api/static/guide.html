@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Answer Engine — Integration Guide</title>
+<style>
+  :root{
+    --navy:#120D42; --blue:#165AE7; --blue-600:#1247c0; --gold:#FAB301;
+    --ink:#1a1730; --muted:#6b6880; --line:#e7e6ef; --bg:#f6f7fb; --card:#fff;
+    --green:#1a9d5a; --green-bg:#e6f6ec; --amber:#b7860b; --amber-bg:#fdf3da;
+    --red:#d23b46; --red-bg:#fbe9ea; --code-bg:#0f0c2e;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.6;}
+  .top{background:var(--navy);color:#fff;padding:34px 24px 30px;}
+  .top .in{max-width:960px;margin:0 auto;}
+  .top .mark{display:inline-flex;align-items:center;gap:11px;}
+  .top .mark .dot{width:34px;height:34px;border-radius:9px;background:var(--gold);color:var(--navy);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;}
+  .top h1{margin:16px 0 6px;font-size:29px;letter-spacing:-.5px;}
+  .top p{margin:0;color:#c9c6e6;max-width:640px;}
+  .wrap{max-width:960px;margin:0 auto;padding:26px 24px 80px;}
+  .grid{display:grid;grid-template-columns:210px 1fr;gap:34px;align-items:start;}
+  nav.toc{position:sticky;top:20px;font-size:13.5px;}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:6px 0;border-left:2px solid transparent;padding-left:12px;}
+  nav.toc a:hover{color:var(--blue);}
+  nav.toc .h{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--navy);font-weight:800;margin:16px 0 4px;padding-left:12px;}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:18px;scroll-margin-top:20px;}
+  section h2{margin:0 0 4px;font-size:19px;letter-spacing:-.3px;}
+  section h3{margin:20px 0 6px;font-size:14.5px;}
+  section p,li{color:#2c2942;font-size:14.5px;}
+  .sub{color:var(--muted);font-size:13.5px;margin-top:0;}
+  code.inl{background:#eef0f8;color:var(--blue-600);padding:2px 6px;border-radius:6px;font-size:13px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  .code{position:relative;background:var(--code-bg);color:#e7e9ff;border-radius:11px;padding:15px 16px;margin:11px 0;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.7px;line-height:1.55;overflow-x:auto;}
+  .code .cp{position:absolute;top:9px;right:9px;background:#2a2760;color:#cfd2ff;border:none;border-radius:7px;
+    padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;}
+  .code .cp:hover{background:var(--blue);color:#fff;}
+  .code .cm{color:#8f93c9;}
+  .code .k{color:var(--gold);}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.3px;}
+  .b-v{background:var(--green-bg);color:var(--green);} .b-q{background:var(--amber-bg);color:var(--amber);}
+  .b-r{background:var(--red-bg);color:var(--red);}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px;}
+  th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--line);}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  td:first-child{white-space:nowrap;}
+  .note{background:#fbf5e2;border:1px solid #f0e2b4;border-radius:10px;padding:12px 15px;font-size:13.5px;margin:12px 0;}
+  .method{display:inline-block;font-weight:800;font-size:11px;padding:3px 8px;border-radius:6px;margin-right:8px;color:#fff;}
+  .m-post{background:var(--blue);} .m-get{background:var(--navy);} .m-del{background:var(--red);}
+  .foot{max-width:960px;margin:0 auto;padding:22px 24px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);}
+  .foot a{color:var(--blue);text-decoration:none;}
+  a.pill{display:inline-block;background:var(--blue);color:#fff;text-decoration:none;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:700;margin-right:8px;margin-top:6px;}
+  a.pill.ghost{background:#eef0f8;color:var(--blue-600);}
+  @media(max-width:760px){.grid{grid-template-columns:1fr;}nav.toc{position:static;display:none;}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="in">
+    <div class="mark"><div class="dot">✓</div><b style="font-size:15px">Answer Engine</b></div>
+    <h1>Integration Guide</h1>
+    <p>How to connect your app to the Evidence-Gated AI System — a reliability gateway that
+    verifies every answer against retrieved evidence before returning it.</p>
+    <div>
+      <a class="pill" href="/docs">Interactive API reference →</a>
+      <a class="pill ghost" href="/dashboard">Admin dashboard →</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="grid">
+  <nav class="toc">
+    <div class="h">Start</div>
+    <a href="#overview">Overview</a>
+    <a href="#base">Base URL</a>
+    <a href="#auth">Authentication</a>
+    <div class="h">Core API</div>
+    <a href="#query">Ask a question</a>
+    <a href="#stream">Streaming</a>
+    <a href="#index">Add a document</a>
+    <a href="#sources">Manage sources</a>
+    <a href="#feedback">Feedback</a>
+    <div class="h">Reference</div>
+    <a href="#states">Answer states</a>
+    <a href="#errors">Errors &amp; limits</a>
+  </nav>
+
+  <main>
+    <section id="overview">
+      <h2>Overview</h2>
+      <p class="sub">What the API does, in one line.</p>
+      <p>You send a <b>question</b> (and optionally your own indexed documents). The engine retrieves
+      supporting evidence, drafts an answer, extracts each factual claim, verifies every claim against
+      the evidence, and applies a policy gate. It returns one of three states — never an unverified guess:</p>
+      <p>
+        <span class="badge b-v">VERIFIED</span> claims fully supported &nbsp;
+        <span class="badge b-q">QUALIFIED</span> partial / caveated &nbsp;
+        <span class="badge b-r">REFUSED</span> not enough evidence
+      </p>
+    </section>
+
+    <section id="base">
+      <h2>Base URL</h2>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button>https://web-production-c8c1.up.railway.app</div>
+      <p>All endpoints below are under <code class="inl">/v1</code>. Interactive reference is at
+      <code class="inl">/docs</code>.</p>
+    </section>
+
+    <section id="auth">
+      <h2>Authentication</h2>
+      <p class="sub">Every <code class="inl">/v1</code> call needs a key.</p>
+      <p>Send your key in the <code class="inl">X-API-Key</code> header (a JWT via
+      <code class="inl">Authorization: Bearer &lt;token&gt;</code> also works). Keys are issued by an
+      administrator — they are shown once and stored only as a hash.</p>
+      <h3>Get a key (admin only)</h3>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button><span class="cm"># Admin mints a key with the service key</span>
+curl -X POST https://web-production-c8c1.up.railway.app/v1/auth/api-keys \
+  -H <span class="k">"X-Service-Key: &lt;SERVICE_KEY&gt;"</span> -H "Content-Type: application/json" \
+  -d '{"tenant_id":"&lt;TENANT_ID&gt;","role":"api_client","name":"my-app"}'</div>
+      <div class="note">🔑 The response contains <code class="inl">api_key</code> (starts with <code class="inl">ae_</code>)
+      <b>once</b>. Store it securely — it cannot be retrieved again.</div>
+    </section>
+
+    <section id="query">
+      <h2><span class="method m-post">POST</span>Ask a question</h2>
+      <p class="sub">/v1/query — run the full evidence-gated pipeline.</p>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button>curl -X POST https://web-production-c8c1.up.railway.app/v1/query \
+  -H <span class="k">"X-API-Key: ae_your_key"</span> -H "Content-Type: application/json" \
+  -d '{"query":"What is the first rank in Brazilian Jiu-Jitsu?",
+       "tenant_id":"&lt;TENANT_ID&gt;"}'</div>
+      <h3>Response</h3>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button>{
+  "final_decision": "VERIFIED",
+  "response_text": "The first rank in Brazilian Jiu-Jitsu is the white belt.",
+  "confidence_summary": "Claim support: 100%. All thresholds met.",
+  "citations": [{"source_name":"BJJ Reference","snippet":"..."}],
+  "uncertainty_notes": [],
+  "trace_id": "….",
+  "latency_ms": 14230
+}</div>
+      <table>
+        <tr><th>Field</th><th>Meaning</th></tr>
+        <tr><td><code class="inl">query</code></td><td>Required. The user's question.</td></tr>
+        <tr><td><code class="inl">tenant_id</code></td><td>Required. Your tenant UUID (scopes evidence + policy).</td></tr>
+        <tr><td><code class="inl">domain_hint</code></td><td>Optional. e.g. <code class="inl">medical</code>, <code class="inl">legal</code> — applies a stricter policy.</td></tr>
+      </table>
+    </section>
+
+    <section id="stream">
+      <h2><span class="method m-post">POST</span>Streaming</h2>
+      <p class="sub">/v1/query/stream — same input, live pipeline events (SSE).</p>
+      <p>Returns <code class="inl">text/event-stream</code>. Each stage
+      (classification → retrieval → claims → verification → policy → final) emits an event as it
+      completes — ideal for showing a live progress UI.</p>
+    </section>
+
+    <section id="index">
+      <h2><span class="method m-post">POST</span>Add a document</h2>
+      <p class="sub">/v1/documents/index — feed your own evidence.</p>
+      <p>Send inline text, or a base64-encoded PDF (text is extracted server-side).</p>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button><span class="cm"># Inline text</span>
+curl -X POST https://web-production-c8c1.up.railway.app/v1/documents/index \
+  -H <span class="k">"X-API-Key: ae_your_key"</span> -H "Content-Type: application/json" \
+  -d '{"source_id":"&lt;SOURCE_ID&gt;","tenant_id":"&lt;TENANT_ID&gt;",
+       "content":"White belt is the first rank in BJJ.","title":"BJJ basics"}'
+
+<span class="cm"># PDF: send "pdf_base64" instead of "content"</span></div>
+    </section>
+
+    <section id="sources">
+      <h2>Manage sources</h2>
+      <p class="sub">Sources group your documents and carry a trust tier (1–5).</p>
+      <p><span class="method m-get">GET</span><code class="inl">/v1/sources?tenant_id=…</code> — list &nbsp;
+         <span class="method m-post">POST</span><code class="inl">/v1/sources</code> — create &nbsp;
+         <span class="method m-del">DEL</span><code class="inl">/v1/sources/{id}?tenant_id=…</code> — delete</p>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button>curl -X POST https://web-production-c8c1.up.railway.app/v1/sources \
+  -H <span class="k">"X-API-Key: ae_your_key"</span> -H "Content-Type: application/json" \
+  -d '{"tenant_id":"&lt;TENANT_ID&gt;","source_name":"BJJ Reference","trust_tier":5}'</div>
+    </section>
+
+    <section id="feedback">
+      <h2><span class="method m-post">POST</span>Feedback</h2>
+      <p class="sub">/v1/feedback — rate an answer (drives calibration).</p>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button>curl -X POST https://web-production-c8c1.up.railway.app/v1/feedback \
+  -H <span class="k">"X-API-Key: ae_your_key"</span> -H "Content-Type: application/json" \
+  -d '{"query_log_id":"&lt;QUERY_ID&gt;","rating":5}'</div>
+    </section>
+
+    <section id="states">
+      <h2>Answer states</h2>
+      <table>
+        <tr><th>State</th><th>When</th><th>What to do</th></tr>
+        <tr><td><span class="badge b-v">VERIFIED</span></td><td>All claims supported above threshold.</td><td>Show <code class="inl">response_text</code> with citations.</td></tr>
+        <tr><td><span class="badge b-q">QUALIFIED</span></td><td>Partial support, or sources conflict.</td><td>Show answer + <code class="inl">uncertainty_notes</code>.</td></tr>
+        <tr><td><span class="badge b-r">REFUSED</span></td><td>Not enough / not trusted enough evidence.</td><td>Show a "no confident answer" message.</td></tr>
+      </table>
+    </section>
+
+    <section id="errors">
+      <h2>Errors &amp; limits</h2>
+      <table>
+        <tr><th>Code</th><th>Meaning</th></tr>
+        <tr><td><code class="inl">401</code></td><td>Missing/invalid key — check <code class="inl">X-API-Key</code>.</td></tr>
+        <tr><td><code class="inl">403</code></td><td>Key lacks the required role.</td></tr>
+        <tr><td><code class="inl">429</code></td><td>Rate limit exceeded — slow down and retry.</td></tr>
+        <tr><td><code class="inl">503</code></td><td>A backing store is temporarily unavailable.</td></tr>
+      </table>
+      <div class="note">The engine never returns an unverified guess. If it can't verify, it
+      <b>refuses</b> — that is the intended behavior, not an error.</div>
+    </section>
+  </main>
+</div>
+</div>
+
+<div class="foot">
+  Answer Engine · Evidence-Gated AI System · <a href="/docs">API reference</a> ·
+  <a href="/dashboard">Dashboard</a> · <a href="/health">Health</a>
+</div>
+
+<script>
+function cp(btn){
+  const el=btn.parentElement.cloneNode(true);
+  el.querySelector('.cp')?.remove();
+  navigator.clipboard.writeText(el.innerText.trim()).then(()=>{
+    const o=btn.textContent;btn.textContent="Copied!";setTimeout(()=>btn.textContent=o,1400);
+  });
+}
+</script>
+</body>
+</html>
