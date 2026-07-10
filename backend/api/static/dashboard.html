@@ -104,6 +104,21 @@
         box-shadow:0 12px 34px rgba(0,0,0,.22);opacity:0;pointer-events:none;transition:.25s;z-index:110;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast.err{background:var(--red);} .toast.ok{background:var(--green);}
+  /* ask console: suggestion chips + live pipeline steps */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:13px;}
+  .chip{background:#EEF1FB;color:var(--blue-600);border:1px solid #DCE3F6;border-radius:999px;
+        padding:6px 13px;font-size:12px;cursor:pointer;transition:.15s;}
+  .chip:hover{background:#E1E7F9;border-color:#C3D0F2;}
+  .steps{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;}
+  .step{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--muted);
+        background:#F3F4F6;border-radius:999px;padding:7px 13px;transition:.25s;}
+  .step .sdot{width:15px;height:15px;border-radius:50%;border:2px solid #CBD2E0;box-sizing:border-box;
+        display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;}
+  .step.active{color:var(--navy);background:#EEF1FB;}
+  .step.active .sdot{border-color:var(--blue);border-right-color:transparent;animation:spin .7s linear infinite;}
+  .step.done{color:var(--green);background:var(--green-bg);}
+  .step.done .sdot{background:var(--green);border-color:var(--green);}
+  @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -165,9 +180,11 @@
     <div class="view" id="view-ask" hidden>
       <section class="panel">
         <h2>Ask console</h2>
-        <div class="desc">Run a question through the full evidence-gated pipeline.</div>
+        <div class="desc">Run a question through the full evidence-gated pipeline — watch each gate live.</div>
+        <div class="chips" id="chips"></div>
         <textarea id="q" rows="3" placeholder="e.g. What is the first rank in Brazilian Jiu-Jitsu?"></textarea>
-        <div class="row" style="margin-top:11px"><button onclick="ask()">Submit query</button></div>
+        <div class="row" style="margin-top:11px"><button id="askBtn" onclick="ask()">Submit query</button></div>
+        <div id="steps"></div>
         <div id="answer"></div>
       </section>
     </div>
@@ -272,15 +289,46 @@ async function loadReviews(){
   }catch(e){$("reviewsList").innerHTML=`<div class="muted">${e.message}</div>`;}}
 async function resolve(id,status){try{await api(`/v1/admin/reviews/${id}/resolve`,{method:"POST",
   headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});toast("Review "+status,"ok");loadReviews();}catch(e){toast(e.message,"err");}}
-async function ask(){const q=$("q").value.trim();if(!q)return;
-  $("answer").innerHTML=`<div class="answer muted">Running the evidence-gated pipeline…</div>`;
-  try{const r=await api(`/v1/query`,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({query:q,tenant_id:tenant()})});
-    const cites=(r.citations||[]).map(c=>`<div class="cite">${c.source_name}: ${c.snippet||""}</div>`).join("");
-    $("answer").innerHTML=`<div class="answer">${badge(r.final_decision)}
-      <div style="margin-top:9px;line-height:1.5">${r.response_text||r.refusal_reason||""}</div>${cites}</div>`;
-    loadMetrics();}catch(e){$("answer").innerHTML=`<div class="answer muted">Error: ${e.message}</div>`;}}
+const STEPS=[["classification","Classify"],["retrieval","Retrieve"],["claims","Extract claims"],
+             ["verification","Verify"],["policy","Policy"],["final","Answer"]];
+const SUGGESTIONS=["What is the first rank in Brazilian Jiu-Jitsu?","How long does it take to earn a BJJ black belt?",
+                   "What does Brazilian Jiu-Jitsu focus on?","What is the capital of France?"];
+function renderChips(){$("chips").innerHTML=SUGGESTIONS.map(s=>`<span class="chip" onclick="pickChip(this)">${s}</span>`).join("");}
+function pickChip(el){$("q").value=el.textContent;$("q").focus();}
+function renderSteps(state){$("steps").innerHTML=STEPS.map(([k,l])=>{
+  const s=state[k]||'pending';const tick=s==='done'?'✓':'';
+  return `<div class="step ${s==='pending'?'':s}"><span class="sdot">${tick}</span>${l}</div>`;}).join("");}
+
+async function ask(){
+  const q=$("q").value.trim();if(!q)return;
+  $("askBtn").disabled=true;
+  const state={};STEPS.forEach(([k])=>state[k]='pending');state[STEPS[0][0]]='active';
+  renderSteps(state);$("answer").innerHTML="";
+  try{
+    const resp=await fetch("/v1/query/stream",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({query:q,tenant_id:tenant()})});
+    const reader=resp.body.getReader();const dec=new TextDecoder();let buf="",finalData=null,errMsg=null;
+    const order=STEPS.map(s=>s[0]);
+    while(true){const {value,done}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf("\n\n"))>=0){const chunk=buf.slice(0,i);buf=buf.slice(i+2);
+        const m=/^event: (.+)$/m.exec(chunk),d=/^data: (.+)$/m.exec(chunk);
+        if(!m)continue;const name=m[1].trim();
+        if(name==="error"){errMsg=d?(JSON.parse(d[1]).detail||"error"):"error";}
+        else if(name==="final"){state.final='done';finalData=d?JSON.parse(d[1]):null;}
+        else if(state[name]!==undefined){state[name]='done';}
+        const nextP=order.find(k=>state[k]==='pending');if(nextP)state[nextP]='active';
+        renderSteps(state);}}
+    if(errMsg){$("answer").innerHTML=`<div class="answer muted">Error: ${errMsg}</div>`;}
+    else if(finalData){const cites=(finalData.citations||[]).map(c=>`<div class="cite">${c.source_name}: ${c.snippet||""}</div>`).join("");
+      $("answer").innerHTML=`<div class="answer">${badge(finalData.final_decision)}
+        <div style="margin-top:9px;line-height:1.5">${finalData.response_text||finalData.refusal_reason||""}</div>${cites}</div>`;}
+    loadMetrics();
+  }catch(e){$("answer").innerHTML=`<div class="answer muted">Error: ${e.message}</div>`;}
+  finally{$("askBtn").disabled=false;}
+}
 function refreshAll(){loadMetrics();loadSources();loadReviews();}
+renderChips();
 refreshAll();
 
 // Live auto-refresh — keeps the dashboard current without a manual reload.
