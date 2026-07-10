@@ -109,24 +109,31 @@
   </header>
 
   <div class="wrap">
-    <div class="kpis section" id="overview">
-      <div class="kpi"><div class="n" id="k-total">–</div><div class="l">Total queries</div></div>
-      <div class="kpi green"><div class="n" id="k-verified">–</div><div class="l">Verified rate</div></div>
-      <div class="kpi gold"><div class="n" id="k-qualified">–</div><div class="l">Qualified rate</div></div>
-      <div class="kpi red"><div class="n" id="k-refused">–</div><div class="l">Refusal rate</div></div>
-      <div class="kpi"><div class="n" id="k-latency">–</div><div class="l">Avg latency</div></div>
+    <!-- Overview -->
+    <div class="view" id="view-overview">
+      <div class="kpis">
+        <div class="kpi"><div class="n" id="k-total">–</div><div class="l">Total queries</div></div>
+        <div class="kpi green"><div class="n" id="k-verified">–</div><div class="l">Verified rate</div></div>
+        <div class="kpi gold"><div class="n" id="k-qualified">–</div><div class="l">Qualified rate</div></div>
+        <div class="kpi red"><div class="n" id="k-refused">–</div><div class="l">Refusal rate</div></div>
+        <div class="kpi"><div class="n" id="k-latency">–</div><div class="l">Avg latency</div></div>
+      </div>
     </div>
 
-    <div class="grid2">
-      <section class="panel section" id="ask">
+    <!-- Ask -->
+    <div class="view" id="view-ask" hidden>
+      <section class="panel">
         <h2>Ask console</h2>
         <div class="desc">Run a question through the full evidence-gated pipeline.</div>
         <textarea id="q" rows="3" placeholder="e.g. What is the first rank in Brazilian Jiu-Jitsu?"></textarea>
         <div class="row" style="margin-top:11px"><button onclick="ask()">Submit query</button></div>
         <div id="answer"></div>
       </section>
+    </div>
 
-      <section class="panel section" id="sources">
+    <!-- Sources -->
+    <div class="view" id="view-sources" hidden>
+      <section class="panel">
         <h2>Sources</h2>
         <div class="desc">Trusted evidence sources for this tenant.</div>
         <div class="row" style="margin-bottom:12px">
@@ -138,11 +145,14 @@
       </section>
     </div>
 
-    <section class="panel section" id="reviews">
-      <h2>Human review queue</h2>
-      <div class="desc">Escalated queries awaiting a reviewer.</div>
-      <div class="list" id="reviewsList"><div class="muted">Loading…</div></div>
-    </section>
+    <!-- Reviews -->
+    <div class="view" id="view-reviews" hidden>
+      <section class="panel">
+        <h2>Human review queue</h2>
+        <div class="desc">Escalated queries awaiting a reviewer.</div>
+        <div class="list" id="reviewsList"><div class="muted">Loading…</div></div>
+      </section>
+    </div>
   </div>
 </main>
 
@@ -150,10 +160,11 @@
 const $=(id)=>document.getElementById(id);
 const tenant=()=>$("tenant").value.trim();
 const badge=(d)=>`<span class="badge b-${(d||'').toLowerCase()}">${d||'?'}</span>`;
-document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>{
-  document.querySelectorAll('#nav a').forEach(x=>x.classList.remove('active'));
-  a.classList.add('active'); $(a.dataset.t).scrollIntoView({behavior:'smooth',block:'start'});
-});
+function showView(t){
+  document.querySelectorAll('.view').forEach(v=>{ v.hidden = (v.id !== 'view-'+t); });
+  document.querySelectorAll('#nav a').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
+}
+document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>showView(a.dataset.t));
 async function api(path,opts){const r=await fetch(path,opts);const t=await r.text();
   let j;try{j=JSON.parse(t)}catch{j=t} if(!r.ok)throw new Error((j&&j.detail)||r.status);return j;}
 
