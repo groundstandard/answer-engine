@@ -94,14 +94,16 @@ def create_app() -> FastAPI:
     # Token minting must stay open (you can't have a token yet to get a token).
     app.include_router(auth.router, prefix="/v1", tags=["Auth"])
 
-    # All other /v1 routes are guarded by require_auth (no-op unless AUTH_REQUIRED).
-    guarded = [Depends(require_auth)]
-    app.include_router(query.router, prefix="/v1", tags=["Query"], dependencies=guarded)
-    app.include_router(documents.router, prefix="/v1", tags=["Documents"], dependencies=guarded)
-    app.include_router(sources.router, prefix="/v1", tags=["Sources"], dependencies=guarded)
-    app.include_router(feedback.router, prefix="/v1", tags=["Feedback"], dependencies=guarded)
-    app.include_router(evaluations.router, prefix="/v1", tags=["Evaluations"], dependencies=guarded)
-    # Admin/analytics surfaces require an elevated role (when auth is enforced).
+    # Developer-facing endpoints shown in /docs are OPEN for now (no sign-in) so the
+    # API can be viewed and tried while it's not in real use. Re-add `guarded` before
+    # going live. The dashboard's admin surfaces below stay protected regardless.
+    open_dev = []
+    app.include_router(query.router, prefix="/v1", tags=["Query"], dependencies=open_dev)
+    app.include_router(documents.router, prefix="/v1", tags=["Documents"], dependencies=open_dev)
+    app.include_router(sources.router, prefix="/v1", tags=["Sources"], dependencies=open_dev)
+    app.include_router(feedback.router, prefix="/v1", tags=["Feedback"], dependencies=open_dev)
+    app.include_router(evaluations.router, prefix="/v1", tags=["Evaluations"], dependencies=open_dev)
+    # Admin/analytics surfaces (the dashboard) still require sign-in.
     staff = [Depends(require_role("admin", "reviewer"))]
     app.include_router(metrics.router, prefix="/v1", tags=["Metrics"], dependencies=staff)
     app.include_router(admin.router, prefix="/v1", tags=["Admin"], dependencies=staff)
