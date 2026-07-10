@@ -92,7 +92,7 @@ def create_app() -> FastAPI:
 
     @app.get("/dashboard", include_in_schema=False)
     async def dashboard():
-        return FileResponse(_STATIC_DIR / "dashboard.html")
+        return FileResponse(_STATIC_DIR / "dashboard.html", headers={"Cache-Control": "no-store"})
 
     @app.get("/docs", include_in_schema=False)
     async def custom_docs():
