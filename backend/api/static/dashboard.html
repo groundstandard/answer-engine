@@ -102,6 +102,12 @@
   .login-card button{width:100%;padding:11px;margin-top:11px;font-size:14px;}
   .login-err{color:var(--red);font-size:12.5px;min-height:16px;margin-top:8px;text-align:center;}
   .login-hint{color:var(--muted);font-size:12px;text-align:center;margin-top:14px;}
+  .busy-overlay{position:fixed;inset:0;background:rgba(18,13,66,.45);display:flex;align-items:center;justify-content:center;z-index:70;}
+  .busy-overlay[hidden]{display:none;}
+  .busy-card{background:#fff;border-radius:14px;padding:26px 32px;display:flex;flex-direction:column;align-items:center;gap:14px;box-shadow:0 22px 60px rgba(0,0,0,.35);}
+  .spinner{width:34px;height:34px;border:3.5px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .busy-card .bm{font-size:13.5px;color:var(--ink);font-weight:600;}
   .section{scroll-margin-top:20px;}
   nav a svg{width:17px;height:17px;flex-shrink:0;}
   .kpi .top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
@@ -294,6 +300,10 @@
   </div>
 </main>
 
+<div id="busy" class="busy-overlay" hidden>
+  <div class="busy-card"><div class="spinner"></div><div class="bm" id="busyMsg">Working…</div></div>
+</div>
+
 <div id="login" class="login-overlay" hidden>
   <div class="login-card">
     <div class="lb"><div class="dot">✓</div><div><b>Answer Engine</b><div class="lsub" style="text-align:left;margin:0">Evidence-gated AI</div></div></div>
@@ -421,11 +431,14 @@ async function loadQueries(){
   }catch(e){$("queriesBody").innerHTML=`<tr><td colspan="5" class="muted">${e.message}</td></tr>`;}
 }
 function queriesPage(dir){qOffset=Math.max(0,qOffset+dir*qLimit);loadQueries();}
+function showBusy(m){$("busyMsg").textContent=m||"Working…";$("busy").hidden=false;}
+function hideBusy(){$("busy").hidden=true;}
 async function mintKey(){
   const name=$("keyName").value.trim();
   const role=$("keyRole").value;
   const exp=$("keyExpiry").value;
   const body={tenant_id:tenant(),role,name:name||null,expires_in_days:exp===""?null:parseInt(exp)};
+  showBusy("Generating key…");
   try{
     const r=await api(`/v1/admin/api-keys`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const life=r.expires_in_days?`expires in ${r.expires_in_days} days`:"never expires";
@@ -437,6 +450,7 @@ async function mintKey(){
     </div>`;
     $("keyName").value="";toast("Key generated","ok");loadKeys();
   }catch(e){toast("Failed: "+e.message,"err");}
+  finally{hideBusy();}
 }
 function copyKey(){const v=$("newKeyVal").textContent;navigator.clipboard.writeText(v).then(()=>toast("Key copied","ok"));}
 const fdate=(s)=>s?String(s).slice(0,10):'—';
@@ -465,9 +479,11 @@ async function loadKeys(){
 }
 async function revokeKey(id){
   if(!(await confirmModal("Revoke this key? The app/user using it loses access immediately.",{title:"Revoke key",okLabel:"Revoke",danger:true})))return;
+  showBusy("Revoking key…");
   try{await api(`/v1/admin/api-keys/${id}/revoke?tenant_id=${tenant()}`,{method:"POST"});
     toast("Key revoked","ok");loadKeys();}
   catch(e){toast("Failed: "+e.message,"err");}
+  finally{hideBusy();}
 }
 async function resolve(id,status){try{await api(`/v1/admin/reviews/${id}/resolve`,{method:"POST",
   headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});toast("Review "+status,"ok");loadReviews();}catch(e){toast(e.message,"err");}}
