@@ -4,8 +4,11 @@ from backend.config.settings import settings
 
 # statement_cache_size=0 is required when connecting through a pgbouncer pooler
 # (Supabase session pooler); it's harmless on a direct connection.
+# .strip() guards against a stray trailing newline/space in the DATABASE_URL env
+# var (a common paste artifact in hosting dashboards) that would otherwise make the
+# driver look for a database literally named "postgres\n".
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    settings.DATABASE_URL.strip(),
     echo=False,
     connect_args={"statement_cache_size": 0},
 )
