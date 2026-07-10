@@ -118,10 +118,10 @@
       <code class="inl">Authorization: Bearer &lt;token&gt;</code> also works). Keys are issued by an
       administrator — they are shown once and stored only as a hash.</p>
       <h3>Get a key</h3>
-      <p>Keys are issued by the owner. The easy way: in the <a href="/dashboard" style="color:var(--blue)">Admin
-      dashboard</a> → <b>API keys</b> tab → enter a name, pick a role
-      (<code class="inl">api_client</code> to call the API), pick an expiry, and click
-      <b>Generate</b>. The <code class="inl">ae_</code> key is shown <b>once</b>.</p>
+      <p><b>Self-service (fastest):</b> go to <a href="/signup" style="color:var(--blue)">/signup</a>,
+      enter your app name + email, and get your own <code class="inl">ae_</code> key instantly
+      (role <code class="inl">api_client</code>, shown once). Each signup gets its own tenant.</p>
+      <p><b>Or ask the owner:</b> they can generate one from the Admin dashboard → <b>API keys</b> tab.</p>
       <h3>Or mint programmatically (admin)</h3>
       <div class="code"><button class="cp" onclick="cp(this)">Copy</button><span class="cm"># Uses an admin key — no service key needed</span>
 curl -X POST https://web-production-c8c1.up.railway.app/v1/admin/api-keys \

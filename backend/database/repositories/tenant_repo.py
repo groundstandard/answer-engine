@@ -1,5 +1,5 @@
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -8,6 +8,16 @@ from sqlalchemy import text
 class TenantRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def create_tenant(self, name: str) -> UUID:
+        """Create a new tenant (used by developer self-service signup)."""
+        tenant_id = uuid4()
+        await self.db.execute(
+            text("INSERT INTO tenants (id, name) VALUES (:id, :name)"),
+            {"id": str(tenant_id), "name": name},
+        )
+        await self.db.commit()
+        return tenant_id
 
     async def get_policy_profile(self, tenant_id: UUID) -> Optional[str]:
         """Return the tenant's configured policy_profile, or None if unknown."""

@@ -14,7 +14,7 @@ from backend.api.deps import require_auth, require_role
 from backend.database.connection import init_db
 from backend.config.settings import settings
 
-_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard", "/guide", "/static")
+_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard", "/guide", "/signup", "/static")
 
 
 @asynccontextmanager
@@ -62,8 +62,8 @@ def create_app() -> FastAPI:
         description=(
             "Reliability gateway that enforces evidence verification before any LLM "
             "response reaches a user.\n\n"
-            "📘 **[Open the Integration Guide →](/guide)** — how to connect your app "
-            "(auth, examples, response states).  •  "
+            "🔑 **[Get an API key →](/signup)** — free self-service signup.  •  "
+            "📘 **[Integration Guide →](/guide)** — how to connect your app.  •  "
             "📊 **[Admin Dashboard →](/dashboard)**"
         ),
         version="1.0.0",
@@ -117,6 +117,10 @@ def create_app() -> FastAPI:
     @app.get("/guide", include_in_schema=False)
     async def guide():
         return FileResponse(_STATIC_DIR / "guide.html", headers={"Cache-Control": "no-store"})
+
+    @app.get("/signup", include_in_schema=False)
+    async def signup_page():
+        return FileResponse(_STATIC_DIR / "signup.html", headers={"Cache-Control": "no-store"})
 
     @app.get("/docs", include_in_schema=False)
     async def custom_docs():

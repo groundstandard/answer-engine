@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Answer Engine — Get an API key</title>
+<style>
+  :root{--navy:#120D42;--blue:#165AE7;--blue-600:#1247c0;--gold:#FAB301;--ink:#1a1730;
+    --muted:#6b6880;--line:#e7e6ef;--bg:#f6f7fb;--green:#1a9d5a;--green-bg:#e6f6ec;--red:#d23b46;--code-bg:#0f0c2e;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--navy);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px;}
+  .card{background:#fff;border-radius:18px;max-width:460px;width:100%;padding:32px 30px;box-shadow:0 26px 70px rgba(0,0,0,.35);}
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px;}
+  .brand .dot{width:36px;height:36px;border-radius:9px;background:var(--gold);color:var(--navy);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;}
+  .brand b{font-size:15px;} .brand span{display:block;color:var(--muted);font-size:12px;}
+  h1{font-size:22px;margin:16px 0 4px;letter-spacing:-.3px;}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 18px;}
+  label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:12px 0 5px;}
+  input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:14px;}
+  button{width:100%;padding:12px;margin-top:16px;border:none;border-radius:11px;background:var(--blue);color:#fff;
+    font-size:14px;font-weight:700;cursor:pointer;}
+  button:disabled{opacity:.6;cursor:not-allowed;}
+  .err{color:var(--red);font-size:12.5px;min-height:16px;margin-top:8px;}
+  .foot{color:var(--muted);font-size:12px;text-align:center;margin-top:16px;}
+  .foot a{color:var(--blue);text-decoration:none;}
+  .result{margin-top:6px;}
+  .kbox{background:var(--code-bg);color:#e7e9ff;border-radius:11px;padding:13px;margin-top:8px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;word-break:break-all;display:flex;gap:10px;align-items:center;}
+  .kbox button{width:auto;margin:0;padding:6px 12px;font-size:11px;border-radius:7px;background:#2a2760;flex-shrink:0;}
+  .ok{background:var(--green-bg);color:var(--green);border-radius:10px;padding:11px 13px;font-size:13px;margin-top:6px;}
+  .note{background:#fbf5e2;border:1px solid #f0e2b4;border-radius:10px;padding:11px 13px;font-size:12.5px;margin-top:12px;}
+  .row{font-size:12px;color:var(--muted);margin-top:8px;}
+  .row code{background:#eef0f8;color:var(--blue-600);padding:2px 6px;border-radius:6px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="dot">✓</div><div><b>Answer Engine</b><span>Evidence-gated AI</span></div></div>
+
+  <div id="form-view">
+    <h1>Get your API key</h1>
+    <p class="sub">Create a free developer key so your app can call the Answer Engine API. Takes a few seconds.</p>
+    <label>App name</label>
+    <input id="app" placeholder="e.g. My Chatbot" />
+    <label>Email</label>
+    <input id="email" type="email" placeholder="you@example.com" />
+    <div class="err" id="err"></div>
+    <button id="btn" onclick="signup()">Get my API key</button>
+    <div class="foot">Already have a key? See the <a href="/guide">Integration Guide</a> · <a href="/docs">API reference</a></div>
+  </div>
+
+  <div id="done-view" style="display:none">
+    <h1>You're in 🎉</h1>
+    <div class="ok">Your API key — copy it now, it's shown only once.</div>
+    <div class="kbox"><span id="keyval"></span><button onclick="copyKey()">Copy</button></div>
+    <div class="row">Your tenant ID: <code id="tid"></code></div>
+    <div class="note">Send this key as the header <code>X-API-Key</code> on every request to
+      <code>/v1/…</code>. It expires in <b id="days">90</b> days. Keep it secret — anyone with it can use your quota.</div>
+    <div class="foot" style="margin-top:16px">Next: read the <a href="/guide">Integration Guide</a> for copy-paste examples.</div>
+  </div>
+</div>
+
+<script>
+const $=(id)=>document.getElementById(id);
+async function signup(){
+  const app=$("app").value.trim(), email=$("email").value.trim();
+  $("err").textContent="";
+  if(app.length<2){$("err").textContent="Enter your app name.";return;}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){$("err").textContent="Enter a valid email.";return;}
+  $("btn").disabled=true;$("btn").textContent="Creating…";
+  try{
+    const r=await fetch("/v1/signup",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({app_name:app,email})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||("Error "+r.status));
+    $("keyval").textContent=j.api_key;
+    $("tid").textContent=j.tenant_id;
+    $("days").textContent=j.expires_in_days;
+    $("form-view").style.display="none";
+    $("done-view").style.display="block";
+  }catch(e){$("err").textContent=e.message;$("btn").disabled=false;$("btn").textContent="Get my API key";}
+}
+function copyKey(){navigator.clipboard.writeText($("keyval").textContent);}
+</script>
+</body>
+</html>
