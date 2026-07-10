@@ -117,13 +117,19 @@
       <p>Send your key in the <code class="inl">X-API-Key</code> header (a JWT via
       <code class="inl">Authorization: Bearer &lt;token&gt;</code> also works). Keys are issued by an
       administrator — they are shown once and stored only as a hash.</p>
-      <h3>Get a key (admin only)</h3>
-      <div class="code"><button class="cp" onclick="cp(this)">Copy</button><span class="cm"># Admin mints a key with the service key</span>
-curl -X POST https://web-production-c8c1.up.railway.app/v1/auth/api-keys \
-  -H <span class="k">"X-Service-Key: &lt;SERVICE_KEY&gt;"</span> -H "Content-Type: application/json" \
-  -d '{"tenant_id":"&lt;TENANT_ID&gt;","role":"api_client","name":"my-app"}'</div>
+      <h3>Get a key</h3>
+      <p>Keys are issued by the owner. The easy way: in the <a href="/dashboard" style="color:var(--blue)">Admin
+      dashboard</a> → <b>API keys</b> tab → enter a name, pick a role
+      (<code class="inl">api_client</code> to call the API), pick an expiry, and click
+      <b>Generate</b>. The <code class="inl">ae_</code> key is shown <b>once</b>.</p>
+      <h3>Or mint programmatically (admin)</h3>
+      <div class="code"><button class="cp" onclick="cp(this)">Copy</button><span class="cm"># Uses an admin key — no service key needed</span>
+curl -X POST https://web-production-c8c1.up.railway.app/v1/admin/api-keys \
+  -H <span class="k">"X-API-Key: ae_admin_key"</span> -H "Content-Type: application/json" \
+  -d '{"tenant_id":"&lt;TENANT_ID&gt;","role":"api_client","name":"my-app","expires_in_days":30}'</div>
       <div class="note">🔑 The response contains <code class="inl">api_key</code> (starts with <code class="inl">ae_</code>)
-      <b>once</b>. Store it securely — it cannot be retrieved again.</div>
+      <b>once</b> — store it securely, it cannot be retrieved again. Keys can expire
+      (<code class="inl">expires_in_days</code>); set it to <code class="inl">null</code> for a non-expiring key.</div>
     </section>
 
     <section id="query">
