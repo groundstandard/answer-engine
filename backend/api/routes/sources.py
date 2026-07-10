@@ -2,7 +2,7 @@ import logging
 from uuid import UUID
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path
 
 from backend.api.schemas.documents import SourceCreate, SourceResponse
 from backend.database.connection import AsyncSessionLocal
@@ -52,3 +52,16 @@ async def create_source(request: SourceCreate):
         logger.exception("Source creation failed")
         raise HTTPException(status_code=500, detail=f"Could not create source: {e}")
     return _to_response(row, source_type=request.source_type)
+
+
+@router.delete("/sources/{source_id}", status_code=200)
+async def delete_source(source_id: UUID = Path(...), tenant_id: UUID = Query(...)):
+    """Delete a source (its indexed evidence cascades)."""
+    try:
+        async with AsyncSessionLocal() as session:
+            ok = await SourcesRepository(session).delete(source_id, tenant_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Source store unavailable: {e}")
+    if not ok:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return {"id": str(source_id), "deleted": True}

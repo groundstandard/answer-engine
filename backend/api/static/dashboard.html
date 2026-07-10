@@ -89,6 +89,20 @@
   .bar>span{transition:width .5s ease;min-width:0;}
   .legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px;font-size:12.5px;color:var(--muted);}
   .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:middle;}
+  /* modal + toast */
+  .modal-overlay{position:fixed;inset:0;background:rgba(18,13,66,.45);display:flex;align-items:center;
+        justify-content:center;z-index:100;backdrop-filter:blur(2px);}
+  .modal{background:#fff;border-radius:16px;padding:24px;width:min(420px,90vw);
+        box-shadow:0 24px 70px rgba(18,13,66,.32);animation:pop .16s ease;}
+  @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal .m-title{font-size:16px;font-weight:800;color:var(--navy);}
+  .modal .m-body{color:var(--muted);font-size:13.5px;margin:9px 0 22px;line-height:1.5;}
+  .modal .m-actions{display:flex;justify-content:flex-end;gap:10px;}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(18px);
+        background:var(--navy);color:#fff;padding:12px 18px;border-radius:11px;font-size:13px;font-weight:500;
+        box-shadow:0 12px 34px rgba(0,0,0,.22);opacity:0;pointer-events:none;transition:.25s;z-index:110;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--red);} .toast.ok{background:var(--green);}
 </style>
 </head>
 <body>
@@ -182,8 +196,34 @@
   </div>
 </main>
 
+<div id="modal" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="m-title" id="m-title">Confirm</div>
+    <div class="m-body" id="m-body"></div>
+    <div class="m-actions">
+      <button class="ghost" id="m-cancel">Cancel</button>
+      <button id="m-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
 <script>
 const $=(id)=>document.getElementById(id);
+function confirmModal(message,{title="Confirm",okLabel="Confirm",danger=false}={}){
+  return new Promise(resolve=>{
+    $("m-title").textContent=title; $("m-body").textContent=message;
+    $("m-ok").textContent=okLabel;
+    $("m-ok").style.background=danger?"var(--red)":"var(--blue)";
+    $("modal").hidden=false;
+    const done=(v)=>{$("modal").hidden=true;$("m-ok").onclick=$("m-cancel").onclick=null;resolve(v);};
+    $("m-ok").onclick=()=>done(true); $("m-cancel").onclick=()=>done(false);
+  });
+}
+let _toastT;
+function toast(msg,type){const el=$("toast");el.textContent=msg;
+  el.className="toast show"+(type?(" "+type):"");
+  clearTimeout(_toastT);_toastT=setTimeout(()=>el.className="toast",3200);}
 const tenant=()=>$("tenant").value.trim();
 const badge=(d)=>`<span class="badge b-${(d||'').toLowerCase()}">${d||'?'}</span>`;
 function showView(t){
@@ -208,14 +248,20 @@ async function loadMetrics(){
 }
 async function loadSources(){
   try{const s=await api(`/v1/sources?tenant_id=${tenant()}`);
-    $("sourcesList").innerHTML=s.length?s.map(x=>`<div class="item"><b>${x.source_name}</b>
-      <div class="meta">trust tier ${x.trust_tier} · ${x.source_id}</div></div>`).join(""):`<div class="muted">No sources yet.</div>`;
+    $("sourcesList").innerHTML=s.length?s.map(x=>`<div class="item" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="min-width:0"><b>${x.source_name}</b><div class="meta">trust tier ${x.trust_tier} · ${x.source_id}</div></div>
+      <button class="sm" style="background:var(--red-bg);color:var(--red)" onclick="delSource('${x.source_id}')">Delete</button>
+      </div>`).join(""):`<div class="muted">No sources yet.</div>`;
   }catch(e){$("sourcesList").innerHTML=`<div class="muted">${e.message}</div>`;}
 }
 async function addSource(){const name=$("srcName").value.trim();if(!name)return;
   try{await api(`/v1/sources`,{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({tenant_id:tenant(),source_name:name,trust_tier:parseInt($("srcTier").value||"3")})});
-    $("srcName").value="";loadSources();}catch(e){alert("Add failed: "+e.message);}}
+    $("srcName").value="";toast("Source added","ok");loadSources();}catch(e){toast("Add failed: "+e.message,"err");}}
+async function delSource(id){
+  if(!(await confirmModal("Delete this source and its indexed evidence?",{title:"Delete source",okLabel:"Delete",danger:true})))return;
+  try{await api(`/v1/sources/${id}?tenant_id=${tenant()}`,{method:"DELETE"});toast("Source deleted","ok");loadSources();loadMetrics();}
+  catch(e){toast("Delete failed: "+e.message,"err");}}
 async function loadReviews(){
   try{const rv=await api(`/v1/admin/reviews?tenant_id=${tenant()}&status=pending`);
     $("reviewsList").innerHTML=rv.length?rv.map(x=>`<div class="item"><b>${x.query_text}</b>
@@ -224,7 +270,7 @@ async function loadReviews(){
       <button class="ghost sm" onclick="resolve('${x.id}','dismissed')">Dismiss</button></div></div>`).join(""):`<div class="muted">No pending reviews.</div>`;
   }catch(e){$("reviewsList").innerHTML=`<div class="muted">${e.message}</div>`;}}
 async function resolve(id,status){try{await api(`/v1/admin/reviews/${id}/resolve`,{method:"POST",
-  headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});loadReviews();}catch(e){alert(e.message);}}
+  headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});toast("Review "+status,"ok");loadReviews();}catch(e){toast(e.message,"err");}}
 async function ask(){const q=$("q").value.trim();if(!q)return;
   $("answer").innerHTML=`<div class="answer muted">Running the evidence-gated pipeline…</div>`;
   try{const r=await api(`/v1/query`,{method:"POST",headers:{"Content-Type":"application/json"},
@@ -235,6 +281,15 @@ async function ask(){const q=$("q").value.trim();if(!q)return;
     loadMetrics();}catch(e){$("answer").innerHTML=`<div class="answer muted">Error: ${e.message}</div>`;}}
 function refreshAll(){loadMetrics();loadSources();loadReviews();}
 refreshAll();
+
+// Live auto-refresh — keeps the dashboard current without a manual reload.
+setInterval(()=>{
+  loadMetrics();
+  const active=document.querySelector('#nav a.active');
+  const t=active?active.dataset.t:'overview';
+  if(t==='sources')loadSources();
+  else if(t==='reviews')loadReviews();
+}, 7000);
 </script>
 </body>
 </html>

@@ -34,6 +34,15 @@ class SourcesRepository:
         await self.db.commit()
         return dict(row._mapping)
 
+    async def delete(self, source_id: UUID, tenant_id: UUID) -> bool:
+        """Delete a source (its evidence_items + checksums cascade)."""
+        result = await self.db.execute(
+            text("DELETE FROM sources WHERE id = :id AND tenant_id = :tenant_id"),
+            {"id": str(source_id), "tenant_id": str(tenant_id)},
+        )
+        await self.db.commit()
+        return result.rowcount > 0
+
     async def list_for_tenant(self, tenant_id: UUID) -> List[dict]:
         result = await self.db.execute(
             text("""
