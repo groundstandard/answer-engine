@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from backend.database.connection import AsyncSessionLocal
+from backend.database.repositories.query_repo import QueryRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -15,6 +16,22 @@ router = APIRouter()
 class SourceUsage(BaseModel):
     source_name: str
     citation_count: int
+
+
+class QueryLogItem(BaseModel):
+    id: UUID
+    query_text: str
+    final_decision: Optional[str] = None
+    policy_profile: Optional[str] = None
+    latency_ms: Optional[int] = None
+    created_at: str
+
+
+class QueryLogPage(BaseModel):
+    items: List[QueryLogItem]
+    total: int
+    limit: int
+    offset: int
 
 
 class MetricsResponse(BaseModel):
@@ -76,6 +93,33 @@ async def get_metrics(tenant_id: Optional[UUID] = Query(None, description="Scope
         qualified_rate=rate("QUALIFIED"),
         refusal_rate=rate("REFUSED"),
         avg_latency_ms=round(weighted_latency / total, 1) if total else 0.0,
+    )
+
+
+@router.get("/metrics/queries", response_model=QueryLogPage)
+async def list_queries(
+    tenant_id: UUID = Query(..., description="Tenant to list query logs for"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """Paginated list of logged queries for a tenant (newest first)."""
+    try:
+        async with AsyncSessionLocal() as session:
+            repo = QueryRepository(session)
+            rows = await repo.list_for_tenant(tenant_id, limit, offset)
+            total = await repo.count_for_tenant(tenant_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Query store unavailable: {e}")
+    return QueryLogPage(
+        items=[
+            QueryLogItem(
+                id=r["id"], query_text=r["query_text"], final_decision=r["final_decision"],
+                policy_profile=r["policy_profile"], latency_ms=r["latency_ms"],
+                created_at=str(r["created_at"]),
+            )
+            for r in rows
+        ],
+        total=total, limit=limit, offset=offset,
     )
 
 

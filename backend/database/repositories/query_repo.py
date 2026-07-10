@@ -48,6 +48,28 @@ class QueryRepository:
         )
         await self.db.commit()
 
+    async def list_for_tenant(self, tenant_id: UUID, limit: int, offset: int) -> list[dict]:
+        """Recent query logs for a tenant, newest first (paginated)."""
+        result = await self.db.execute(
+            text("""
+                SELECT id, query_text, final_decision, policy_profile,
+                       latency_ms, created_at
+                FROM query_logs
+                WHERE tenant_id = :tid
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            {"tid": str(tenant_id), "limit": limit, "offset": offset},
+        )
+        return [dict(r._mapping) for r in result.fetchall()]
+
+    async def count_for_tenant(self, tenant_id: UUID) -> int:
+        result = await self.db.execute(
+            text("SELECT COUNT(*) FROM query_logs WHERE tenant_id = :tid"),
+            {"tid": str(tenant_id)},
+        )
+        return int(result.scalar() or 0)
+
     async def get_query(self, query_id: UUID) -> Optional[dict]:
         result = await self.db.execute(
             text("SELECT * FROM query_logs WHERE id = :id"),
