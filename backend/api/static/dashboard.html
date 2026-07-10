@@ -3,172 +3,197 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Answer Engine — Admin Dashboard</title>
+<title>Answer Engine — Admin</title>
 <style>
-  :root {
-    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --border:#334155;
-    --text:#e2e8f0; --muted:#94a3b8; --primary:#6366f1;
-    --green:#10b981; --amber:#f59e0b; --red:#ef4444;
+  :root{
+    --navy:#120D42; --navy-600:#0F0B38; --blue:#165AE7; --blue-600:#1248B9;
+    --gold:#FAB301; --gold-100:#FEF3D3;
+    --bg:#F5F6FA; --card:#FFFFFF; --line:#E5E7EB; --ink:#120D42; --muted:#6B7280;
+    --green:#15803D; --green-bg:#DCFCE7; --amber:#92400E; --amber-bg:#FEF3C7;
+    --red:#991B1B; --red-bg:#FEF2F2;
+    --shadow:0 1px 2px rgba(18,13,66,.04),0 8px 24px rgba(18,13,66,.06);
   }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-         background:var(--bg); color:var(--text); }
-  header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex;
-           align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
-  header h1 { font-size:18px; margin:0; letter-spacing:-.3px; }
-  header .sub { color:var(--muted); font-size:13px; margin-top:2px; }
-  .tenant { display:flex; align-items:center; gap:8px; }
-  .tenant input { background:var(--panel); border:1px solid var(--border); color:var(--text);
-                  border-radius:8px; padding:8px 10px; width:320px; font-size:13px; font-family:monospace; }
-  main { padding:24px; max-width:1100px; margin:0 auto; display:grid; gap:20px; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; }
-  .card .n { font-size:26px; font-weight:800; letter-spacing:-.5px; }
-  .card .l { color:var(--muted); font-size:12px; margin-top:4px; text-transform:uppercase; letter-spacing:.5px; }
-  section.panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px; }
-  section.panel h2 { font-size:14px; margin:0 0 14px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
-  button { background:var(--primary); color:#fff; border:0; border-radius:8px; padding:8px 14px;
-           font-size:13px; font-weight:600; cursor:pointer; }
-  button.ghost { background:var(--panel2); }
-  button.sm { padding:5px 10px; font-size:12px; }
-  input.f, textarea.f { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
-                        border-radius:8px; padding:9px 11px; font-size:13px; font-family:inherit; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .list { display:grid; gap:8px; }
-  .item { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
-  .item .meta { color:var(--muted); font-size:12px; margin-top:3px; }
-  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
-  .b-verified{background:rgba(16,185,129,.15);color:var(--green);}
-  .b-qualified{background:rgba(245,158,11,.15);color:var(--amber);}
-  .b-refused{background:rgba(239,68,68,.15);color:var(--red);}
-  .b-escalated{background:rgba(99,102,241,.15);color:var(--primary);}
-  .muted { color:var(--muted); font-size:13px; }
-  .answer { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px; margin-top:12px; }
-  .cite { font-size:12px; color:var(--muted); border-left:2px solid var(--border); padding-left:10px; margin-top:6px; }
-  .split { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-  @media (max-width:760px){ .split{grid-template-columns:1fr;} .tenant input{width:200px;} }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       background:var(--bg);color:var(--ink);display:flex;min-height:100vh;}
+  /* sidebar */
+  aside{width:240px;background:linear-gradient(180deg,var(--navy),var(--navy-600));
+        color:#fff;padding:22px 16px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
+  .brand{display:flex;align-items:center;gap:11px;padding:6px 8px 20px;}
+  .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--gold);
+        display:flex;align-items:center;justify-content:center;color:var(--navy);font-weight:900;flex-shrink:0;}
+  .brand b{font-size:15px;letter-spacing:-.2px;line-height:1.1;}
+  .brand span{display:block;font-size:11px;color:#a9a3d6;font-weight:500;}
+  nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+        color:#c9c5e8;text-decoration:none;font-size:14px;font-weight:500;cursor:pointer;transition:.15s;}
+  nav a:hover{background:rgba(255,255,255,.07);color:#fff;}
+  nav a.active{background:var(--blue);color:#fff;}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.7;}
+  aside .foot{margin-top:auto;font-size:11px;color:#8b86b8;padding:8px;}
+  /* main */
+  main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:16px 28px;
+         display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+  header h1{margin:0;font-size:17px;letter-spacing:-.3px;}
+  header .sub{color:var(--muted);font-size:12.5px;margin-top:2px;}
+  .tenant{display:flex;align-items:center;gap:8px;}
+  .tenant label{font-size:12px;color:var(--muted);}
+  .tenant input{border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:300px;
+        font-size:12px;font-family:ui-monospace,monospace;color:var(--ink);background:#fff;}
+  .wrap{padding:24px 28px;max-width:1080px;width:100%;display:grid;gap:22px;}
+  /* kpi cards */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;
+       box-shadow:var(--shadow);position:relative;overflow:hidden;}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--blue);}
+  .kpi.gold::before{background:var(--gold);} .kpi.green::before{background:var(--green);}
+  .kpi.red::before{background:var(--red);}
+  .kpi .n{font-size:27px;font-weight:800;letter-spacing:-.6px;}
+  .kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:3px;font-weight:600;}
+  /* panels */
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow);}
+  .panel h2{margin:0 0 4px;font-size:15px;letter-spacing:-.2px;}
+  .panel .desc{color:var(--muted);font-size:12.5px;margin-bottom:16px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr;} aside{width:64px;} .brand b,.brand span,nav a span,aside .foot{display:none;} .tenant input{width:170px;}}
+  textarea,input.f{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 13px;
+        font-size:13.5px;font-family:inherit;color:var(--ink);background:#fff;}
+  textarea:focus,input.f:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,90,231,.12);}
+  button{background:var(--blue);color:#fff;border:0;border-radius:10px;padding:10px 16px;
+         font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s;}
+  button:hover{background:var(--blue-600);}
+  button.sm{padding:6px 12px;font-size:12px;border-radius:8px;}
+  button.ghost{background:#EEF1FB;color:var(--blue);}
+  button.ghost:hover{background:#E1E7F9;}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
+  .list{display:grid;gap:9px;}
+  .item{border:1px solid var(--line);border-radius:11px;padding:13px 15px;background:#fff;}
+  .item b{font-size:13.5px;} .item .meta{color:var(--muted);font-size:12px;margin-top:3px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.3px;}
+  .b-verified{background:var(--green-bg);color:var(--green);}
+  .b-qualified{background:var(--amber-bg);color:var(--amber);}
+  .b-refused{background:var(--red-bg);color:var(--red);}
+  .b-escalated{background:#E7EDFD;color:var(--blue-600);}
+  .answer{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px;background:#FBFCFE;}
+  .cite{font-size:12px;color:var(--muted);border-left:3px solid var(--gold);padding-left:11px;margin-top:8px;}
+  .muted{color:var(--muted);font-size:13px;}
+  .section{scroll-margin-top:20px;}
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <h1>Answer Engine — Admin Dashboard</h1>
-    <div class="sub">Evidence-gated verification · metrics, sources, review queue, test console</div>
+<aside>
+  <div class="brand">
+    <div class="mark">✓</div>
+    <div><b>Answer Engine</b><span>Evidence-gated AI</span></div>
   </div>
-  <div class="tenant">
-    <span class="muted">Tenant</span>
-    <input id="tenant" value="3aa67dce-9bbf-4a83-8d77-d461fabd6726" />
-    <button class="ghost sm" onclick="refreshAll()">Refresh</button>
-  </div>
-</header>
+  <nav id="nav">
+    <a class="active" data-t="overview"><span class="dot"></span><span>Overview</span></a>
+    <a data-t="ask"><span class="dot"></span><span>Ask console</span></a>
+    <a data-t="sources"><span class="dot"></span><span>Sources</span></a>
+    <a data-t="reviews"><span class="dot"></span><span>Review queue</span></a>
+  </nav>
+  <div class="foot">v1.0 · groundstandard</div>
+</aside>
 
 <main>
-  <div class="cards" id="metrics"></div>
+  <header>
+    <div>
+      <h1>Admin &amp; Analytics</h1>
+      <div class="sub">Verified · Qualified · Refused — every answer, traceable</div>
+    </div>
+    <div class="tenant">
+      <label>Tenant</label>
+      <input id="tenant" value="3aa67dce-9bbf-4a83-8d77-d461fabd6726" />
+      <button class="ghost sm" onclick="refreshAll()">Refresh</button>
+    </div>
+  </header>
 
-  <div class="split">
-    <section class="panel">
-      <h2>Ask (test query)</h2>
-      <textarea id="q" class="f" rows="3" placeholder="Ask a question against this tenant's evidence…"></textarea>
-      <div class="row" style="margin-top:10px"><button onclick="ask()">Submit query</button></div>
-      <div id="answer"></div>
-    </section>
+  <div class="wrap">
+    <div class="kpis section" id="overview">
+      <div class="kpi"><div class="n" id="k-total">–</div><div class="l">Total queries</div></div>
+      <div class="kpi green"><div class="n" id="k-verified">–</div><div class="l">Verified rate</div></div>
+      <div class="kpi gold"><div class="n" id="k-qualified">–</div><div class="l">Qualified rate</div></div>
+      <div class="kpi red"><div class="n" id="k-refused">–</div><div class="l">Refusal rate</div></div>
+      <div class="kpi"><div class="n" id="k-latency">–</div><div class="l">Avg latency</div></div>
+    </div>
 
-    <section class="panel">
-      <h2>Sources</h2>
-      <div class="row" style="margin-bottom:10px">
-        <input id="srcName" class="f" style="flex:1" placeholder="Source name" />
-        <input id="srcTier" class="f" style="width:90px" type="number" min="1" max="5" value="3" title="trust tier 1-5" />
-        <button class="sm" onclick="addSource()">Add</button>
-      </div>
-      <div class="list" id="sources"><div class="muted">Loading…</div></div>
+    <div class="grid2">
+      <section class="panel section" id="ask">
+        <h2>Ask console</h2>
+        <div class="desc">Run a question through the full evidence-gated pipeline.</div>
+        <textarea id="q" rows="3" placeholder="e.g. What is the first rank in Brazilian Jiu-Jitsu?"></textarea>
+        <div class="row" style="margin-top:11px"><button onclick="ask()">Submit query</button></div>
+        <div id="answer"></div>
+      </section>
+
+      <section class="panel section" id="sources">
+        <h2>Sources</h2>
+        <div class="desc">Trusted evidence sources for this tenant.</div>
+        <div class="row" style="margin-bottom:12px">
+          <input id="srcName" class="f" style="flex:1" placeholder="Source name" />
+          <input id="srcTier" class="f" style="width:80px" type="number" min="1" max="5" value="3" />
+          <button class="sm" onclick="addSource()">Add</button>
+        </div>
+        <div class="list" id="sourcesList"><div class="muted">Loading…</div></div>
+      </section>
+    </div>
+
+    <section class="panel section" id="reviews">
+      <h2>Human review queue</h2>
+      <div class="desc">Escalated queries awaiting a reviewer.</div>
+      <div class="list" id="reviewsList"><div class="muted">Loading…</div></div>
     </section>
   </div>
-
-  <section class="panel">
-    <h2>Review queue (pending)</h2>
-    <div class="list" id="reviews"><div class="muted">Loading…</div></div>
-  </section>
 </main>
 
 <script>
-const $ = (id) => document.getElementById(id);
-const tenant = () => $("tenant").value.trim();
-const badge = (d) => `<span class="badge b-${(d||'').toLowerCase()}">${d||'?'}</span>`;
+const $=(id)=>document.getElementById(id);
+const tenant=()=>$("tenant").value.trim();
+const badge=(d)=>`<span class="badge b-${(d||'').toLowerCase()}">${d||'?'}</span>`;
+document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>{
+  document.querySelectorAll('#nav a').forEach(x=>x.classList.remove('active'));
+  a.classList.add('active'); $(a.dataset.t).scrollIntoView({behavior:'smooth',block:'start'});
+});
+async function api(path,opts){const r=await fetch(path,opts);const t=await r.text();
+  let j;try{j=JSON.parse(t)}catch{j=t} if(!r.ok)throw new Error((j&&j.detail)||r.status);return j;}
 
-async function api(path, opts) {
-  const r = await fetch(path, opts);
-  const t = await r.text();
-  let j; try { j = JSON.parse(t); } catch { j = t; }
-  if (!r.ok) throw new Error((j && j.detail) || r.status);
-  return j;
+async function loadMetrics(){
+  try{const m=await api(`/v1/metrics?tenant_id=${tenant()}`);
+    $("k-total").textContent=m.total_queries;
+    $("k-verified").textContent=(m.verified_rate*100).toFixed(0)+"%";
+    $("k-qualified").textContent=(m.qualified_rate*100).toFixed(0)+"%";
+    $("k-refused").textContent=(m.refusal_rate*100).toFixed(0)+"%";
+    $("k-latency").textContent=Math.round(m.avg_latency_ms)+" ms";
+  }catch(e){$("k-total").textContent="—";}
 }
-
-async function loadMetrics() {
-  try {
-    const m = await api(`/v1/metrics?tenant_id=${tenant()}`);
-    $("metrics").innerHTML = [
-      ["Total queries", m.total_queries],
-      ["Verified", (m.verified_rate*100).toFixed(0)+"%"],
-      ["Qualified", (m.qualified_rate*100).toFixed(0)+"%"],
-      ["Refused", (m.refusal_rate*100).toFixed(0)+"%"],
-      ["Avg latency", Math.round(m.avg_latency_ms)+" ms"],
-    ].map(([l,n]) => `<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
-  } catch(e){ $("metrics").innerHTML = `<div class="card"><div class="muted">Metrics unavailable: ${e.message}</div></div>`; }
+async function loadSources(){
+  try{const s=await api(`/v1/sources?tenant_id=${tenant()}`);
+    $("sourcesList").innerHTML=s.length?s.map(x=>`<div class="item"><b>${x.source_name}</b>
+      <div class="meta">trust tier ${x.trust_tier} · ${x.source_id}</div></div>`).join(""):`<div class="muted">No sources yet.</div>`;
+  }catch(e){$("sourcesList").innerHTML=`<div class="muted">${e.message}</div>`;}
 }
-
-async function loadSources() {
-  try {
-    const s = await api(`/v1/sources?tenant_id=${tenant()}`);
-    $("sources").innerHTML = s.length ? s.map(x =>
-      `<div class="item"><b>${x.source_name}</b> · tier ${x.trust_tier}
-       <div class="meta">${x.source_id}</div></div>`).join("")
-      : `<div class="muted">No sources yet.</div>`;
-  } catch(e){ $("sources").innerHTML = `<div class="muted">${e.message}</div>`; }
-}
-
-async function addSource() {
-  const name = $("srcName").value.trim(); if(!name) return;
-  try {
-    await api(`/v1/sources`, {method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({tenant_id:tenant(), source_name:name, trust_tier:parseInt($("srcTier").value||"3")})});
-    $("srcName").value=""; loadSources();
-  } catch(e){ alert("Add source failed: "+e.message); }
-}
-
-async function loadReviews() {
-  try {
-    const rv = await api(`/v1/admin/reviews?tenant_id=${tenant()}&status=pending`);
-    $("reviews").innerHTML = rv.length ? rv.map(x =>
-      `<div class="item"><b>${x.query_text}</b>
-        <div class="meta">${x.reason||""} · ${x.created_at}</div>
-        <div class="row" style="margin-top:8px">
-          <button class="sm" onclick="resolve('${x.id}','resolved')">Resolve</button>
-          <button class="ghost sm" onclick="resolve('${x.id}','dismissed')">Dismiss</button>
-        </div></div>`).join("")
-      : `<div class="muted">No pending reviews.</div>`;
-  } catch(e){ $("reviews").innerHTML = `<div class="muted">${e.message}</div>`; }
-}
-
-async function resolve(id, status) {
-  try { await api(`/v1/admin/reviews/${id}/resolve`, {method:"POST",
-    headers:{"Content-Type":"application/json"}, body: JSON.stringify({status})}); loadReviews(); }
-  catch(e){ alert("Resolve failed: "+e.message); }
-}
-
-async function ask() {
-  const q = $("q").value.trim(); if(!q) return;
-  $("answer").innerHTML = `<div class="answer muted">Running the evidence-gated pipeline…</div>`;
-  try {
-    const r = await api(`/v1/query`, {method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({query:q, tenant_id:tenant()})});
-    const cites = (r.citations||[]).map(c => `<div class="cite">${c.source_name}: ${c.snippet||""}</div>`).join("");
-    $("answer").innerHTML = `<div class="answer">${badge(r.final_decision)}
-      <div style="margin-top:8px">${r.response_text || r.refusal_reason || ""}</div>${cites}</div>`;
-    loadMetrics();
-  } catch(e){ $("answer").innerHTML = `<div class="answer muted">Error: ${e.message}</div>`; }
-}
-
-function refreshAll(){ loadMetrics(); loadSources(); loadReviews(); }
+async function addSource(){const name=$("srcName").value.trim();if(!name)return;
+  try{await api(`/v1/sources`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({tenant_id:tenant(),source_name:name,trust_tier:parseInt($("srcTier").value||"3")})});
+    $("srcName").value="";loadSources();}catch(e){alert("Add failed: "+e.message);}}
+async function loadReviews(){
+  try{const rv=await api(`/v1/admin/reviews?tenant_id=${tenant()}&status=pending`);
+    $("reviewsList").innerHTML=rv.length?rv.map(x=>`<div class="item"><b>${x.query_text}</b>
+      <div class="meta">${x.reason||""} · ${x.created_at}</div>
+      <div class="row" style="margin-top:9px"><button class="sm" onclick="resolve('${x.id}','resolved')">Resolve</button>
+      <button class="ghost sm" onclick="resolve('${x.id}','dismissed')">Dismiss</button></div></div>`).join(""):`<div class="muted">No pending reviews.</div>`;
+  }catch(e){$("reviewsList").innerHTML=`<div class="muted">${e.message}</div>`;}}
+async function resolve(id,status){try{await api(`/v1/admin/reviews/${id}/resolve`,{method:"POST",
+  headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});loadReviews();}catch(e){alert(e.message);}}
+async function ask(){const q=$("q").value.trim();if(!q)return;
+  $("answer").innerHTML=`<div class="answer muted">Running the evidence-gated pipeline…</div>`;
+  try{const r=await api(`/v1/query`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({query:q,tenant_id:tenant()})});
+    const cites=(r.citations||[]).map(c=>`<div class="cite">${c.source_name}: ${c.snippet||""}</div>`).join("");
+    $("answer").innerHTML=`<div class="answer">${badge(r.final_decision)}
+      <div style="margin-top:9px;line-height:1.5">${r.response_text||r.refusal_reason||""}</div>${cites}</div>`;
+    loadMetrics();}catch(e){$("answer").innerHTML=`<div class="answer muted">Error: ${e.message}</div>`;}}
+function refreshAll(){loadMetrics();loadSources();loadReviews();}
 refreshAll();
 </script>
 </body>

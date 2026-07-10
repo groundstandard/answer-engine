@@ -1,0 +1,32 @@
+/* Answer Engine — TAMA-branded Swagger UI theme (navy #120D42 / blue #165AE7 / gold #FAB301) */
+body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+
+.swagger-ui .topbar { background-color: #120D42; padding: 12px 0; }
+.swagger-ui .topbar .download-url-wrapper { display: none; }
+
+.swagger-ui .info { margin: 28px 0; }
+.swagger-ui .info .title { color: #120D42; font-weight: 800; letter-spacing: -0.5px; }
+.swagger-ui .info .title small.version-stamp { background: #FAB301; }
+.swagger-ui .info .title small { background: #165AE7; }
+
+/* Auth button */
+.swagger-ui .btn.authorize { background: #165AE7; border-color: #165AE7; color: #fff; border-radius: 8px; }
+.swagger-ui .btn.authorize svg { fill: #fff; }
+.swagger-ui .btn.execute { background: #165AE7; border-color: #165AE7; border-radius: 8px; }
+
+/* Section tags */
+.swagger-ui .opblock-tag { color: #120D42; font-weight: 700; border-bottom: 1px solid #E5E7EB; }
+
+/* POST */
+.swagger-ui .opblock.opblock-post { border-color: #165AE7; background: rgba(22,90,231,0.03); }
+.swagger-ui .opblock.opblock-post .opblock-summary-method { background: #165AE7; }
+/* GET */
+.swagger-ui .opblock.opblock-get { border-color: #120D42; background: rgba(18,13,66,0.03); }
+.swagger-ui .opblock.opblock-get .opblock-summary-method { background: #120D42; }
+
+.swagger-ui .opblock { border-radius: 12px; box-shadow: 0 4px 14px rgba(18,13,66,0.05); margin: 0 0 14px; }
+.swagger-ui .opblock .opblock-summary-method { border-radius: 8px; }
+
+/* Links + accents */
+.swagger-ui a { color: #165AE7; }
+.swagger-ui .scheme-container { box-shadow: none; border-bottom: 1px solid #E5E7EB; }

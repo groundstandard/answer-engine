@@ -3,6 +3,8 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_swagger_ui_html
 from contextlib import asynccontextmanager
 
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -12,7 +14,7 @@ from backend.api.deps import require_auth, require_role
 from backend.database.connection import init_db
 from backend.config.settings import settings
 
-_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard")
+_RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard", "/static")
 
 
 @asynccontextmanager
@@ -46,7 +48,11 @@ def create_app() -> FastAPI:
         description="Reliability gateway that enforces evidence verification before any LLM response reaches a user.",
         version="1.0.0",
         lifespan=lifespan,
+        docs_url=None,   # replaced by a branded custom /docs below
+        redoc_url=None,
     )
+
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     app.add_middleware(
         CORSMiddleware,
@@ -58,7 +64,7 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def rate_limit(request, call_next):
-        if request.url.path not in _RATE_LIMIT_EXEMPT:
+        if not request.url.path.startswith(_RATE_LIMIT_EXEMPT):
             try:
                 await rate_limiter.check(request)
             except HTTPException as e:
@@ -87,6 +93,14 @@ def create_app() -> FastAPI:
     @app.get("/dashboard", include_in_schema=False)
     async def dashboard():
         return FileResponse(_STATIC_DIR / "dashboard.html")
+
+    @app.get("/docs", include_in_schema=False)
+    async def custom_docs():
+        return get_swagger_ui_html(
+            openapi_url="/openapi.json",
+            title="Answer Engine — API Reference",
+            swagger_css_url="/static/swagger-theme.css",
+        )
 
     return app
 
