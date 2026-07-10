@@ -92,6 +92,7 @@
   /* modal + toast */
   .modal-overlay{position:fixed;inset:0;background:rgba(18,13,66,.45);display:flex;align-items:center;
         justify-content:center;z-index:100;backdrop-filter:blur(2px);}
+  .modal-overlay[hidden]{display:none;}  /* the class's display:flex would otherwise beat the hidden attr */
   .modal{background:#fff;border-radius:16px;padding:24px;width:min(420px,90vw);
         box-shadow:0 24px 70px rgba(18,13,66,.32);animation:pop .16s ease;}
   @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
