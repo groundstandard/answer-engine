@@ -11,7 +11,7 @@ from backend.database.connection import AsyncSessionLocal
 from backend.database.repositories.review_repo import ReviewRepository
 from backend.database.repositories.audit_repo import AuditRepository
 from backend.database.repositories.tenant_repo import TenantRepository
-from backend.database.repositories.api_key_repo import ApiKeyRepository
+from backend.database.repositories.api_key_repo import ApiKeyRepository, decrypt_key, mask_key
 from backend.config.policy_loader import (
     load_policy_config,
     apply_policy_overrides,
@@ -176,24 +176,32 @@ async def mint_api_key(body: NewKeyRequest):
     }
 
 
-@router.get("/admin/api-keys", dependencies=[Depends(require_role("admin"))])
-async def list_api_keys(tenant_id: UUID = Query(...)):
-    """Admin-only: list issued keys for a tenant (metadata only, never the key)."""
+@router.get("/admin/api-keys")
+async def list_api_keys(
+    tenant_id: UUID = Query(...),
+    claims=Depends(require_role("admin", "reviewer")),
+):
+    """List issued keys for a tenant. The owner (admin) sees the full key; a
+    reviewer sees only a masked preview. The key is stored encrypted at rest."""
+    is_admin = (claims or {}).get("role", "admin") == "admin"  # auth-off dev = admin
     try:
         async with AsyncSessionLocal() as session:
             rows = await ApiKeyRepository(session).list_for_tenant(tenant_id)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=503, detail=f"Key store unavailable: {e}")
-    return [
-        {
+    out = []
+    for r in rows:
+        full = decrypt_key(r["key_cipher"])
+        out.append({
             "id": str(r["id"]), "name": r["name"], "role": r["role"],
             "is_active": r["is_active"],
             "created_at": str(r["created_at"]),
             "last_used_at": str(r["last_used_at"]) if r["last_used_at"] else None,
             "expires_at": str(r["expires_at"]) if r["expires_at"] else None,
-        }
-        for r in rows
-    ]
+            "api_key": full if (is_admin and full) else None,
+            "api_key_masked": mask_key(full),
+        })
+    return out
 
 
 @router.post("/admin/api-keys/{key_id}/revoke", dependencies=[Depends(require_role("admin"))])

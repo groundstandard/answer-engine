@@ -85,6 +85,7 @@
   .pager{display:flex;align-items:center;gap:12px;margin-top:15px;}
   .pager button[disabled]{opacity:.4;cursor:not-allowed;}
   .sel{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;background:#fff;color:var(--ink);}
+  .kmono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;}
   .inl2{background:#eef0f8;color:var(--blue-600);padding:2px 6px;border-radius:6px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;}
   .keybox{margin-top:14px;border:1px solid var(--line);border-radius:11px;padding:15px;background:#FBFCFE;}
   .keybox .val{display:flex;align-items:center;gap:10px;margin-top:8px;background:#0f0c2e;color:#e7e9ff;
@@ -276,8 +277,8 @@
         <h2>Issued keys</h2>
         <div class="desc">Who has access. The key itself is never stored — revoke to cut access instantly.</div>
         <div style="overflow-x:auto;margin-top:6px"><table class="tbl">
-          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Created</th><th>Expires</th><th>Last used</th><th></th></tr></thead>
-          <tbody id="keysBody"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+          <thead><tr><th>Name</th><th>Key</th><th>Role</th><th>Status</th><th>Created</th><th>Expires</th><th>Last used</th><th></th></tr></thead>
+          <tbody id="keysBody"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
         </table></div>
       </section>
     </div>
@@ -446,8 +447,12 @@ async function loadKeys(){
         :(k.expires_at&&new Date(k.expires_at)<new Date())?`<span class="badge b-qualified">expired</span>`
         :`<span class="badge b-verified">active</span>`;
       const canRevoke=k.is_active;
+      const keyCell = k.api_key
+        ? `<span class="kmono">${esc(k.api_key)}</span> <button class="sm" onclick="navigator.clipboard.writeText('${k.api_key}').then(()=>toast('Key copied','ok'))">Copy</button>`
+        : (k.api_key_masked ? `<span class="kmono muted">${k.api_key_masked}</span>` : `<span class="muted">—</span>`);
       return `<tr>
         <td class="q">${esc(k.name)||'<span class="muted">(unnamed)</span>'}</td>
+        <td>${keyCell}</td>
         <td class="muted">${k.role}</td>
         <td>${st}</td>
         <td class="muted">${fdate(k.created_at)}</td>
@@ -455,8 +460,8 @@ async function loadKeys(){
         <td class="muted">${k.last_used_at?fdate(k.last_used_at):'—'}</td>
         <td>${canRevoke?`<button class="sm" style="background:var(--red-bg);color:var(--red)" onclick="revokeKey('${k.id}')">Revoke</button>`:''}</td>
       </tr>`;}).join("")
-      :`<tr><td colspan="7" class="muted">No keys yet.</td></tr>`;
-  }catch(e){$("keysBody").innerHTML=`<tr><td colspan="7" class="muted">${e.message}</td></tr>`;}
+      :`<tr><td colspan="8" class="muted">No keys yet.</td></tr>`;
+  }catch(e){$("keysBody").innerHTML=`<tr><td colspan="8" class="muted">${e.message}</td></tr>`;}
 }
 async function revokeKey(id){
   if(!(await confirmModal("Revoke this key? The app/user using it loses access immediately.",{title:"Revoke key",okLabel:"Revoke",danger:true})))return;

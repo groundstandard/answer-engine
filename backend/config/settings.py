@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     N8N_WEBHOOK_AUTH_HEADER: str = ""  # e.g. "Authorization" or "X-Api-Key"
     N8N_WEBHOOK_AUTH_TOKEN: str = ""   # value sent in the header above
 
+    # Secret used to encrypt stored API keys at rest so the owner (admin) can view
+    # full keys later. Falls back to JWT_SECRET if unset. Keep it in env, never in DB.
+    KEY_ENCRYPTION_SECRET: str = ""
+
     JWT_SECRET: str = "changeme-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60

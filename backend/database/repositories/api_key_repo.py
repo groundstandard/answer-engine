@@ -1,9 +1,12 @@
+import base64
 import hashlib
 import secrets
 from uuid import UUID, uuid4
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+
+from backend.config.settings import settings
 
 
 def hash_key(raw_key: str) -> str:
@@ -12,6 +15,36 @@ def hash_key(raw_key: str) -> str:
 
 def generate_key() -> str:
     return "ae_" + secrets.token_urlsafe(32)
+
+
+def _fernet():
+    from cryptography.fernet import Fernet
+    secret = (settings.KEY_ENCRYPTION_SECRET or settings.JWT_SECRET or "changeme").encode()
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(secret).digest()))
+
+
+def encrypt_key(raw: str) -> str:
+    return _fernet().encrypt(raw.encode()).decode()
+
+
+def decrypt_key(cipher: Optional[str]) -> Optional[str]:
+    """Recover a stored key. Returns None if absent or undecryptable (e.g. secret rotated)."""
+    if not cipher:
+        return None
+    try:
+        return _fernet().decrypt(cipher.encode()).decode()
+    except Exception:  # noqa: BLE001 — never leak crypto errors to callers
+        return None
+
+
+def mask_key(raw: Optional[str]) -> Optional[str]:
+    """ae_GXYKYS…AdrY — enough to recognize a key, not enough to use it."""
+    if not raw:
+        return None
+    body = raw[3:] if raw.startswith("ae_") else raw
+    if len(body) <= 8:
+        return "ae_…"
+    return f"ae_{body[:4]}…{body[-4:]}"
 
 
 class ApiKeyRepository:
@@ -28,15 +61,15 @@ class ApiKeyRepository:
         key_id = uuid4()
         await self.db.execute(
             text("""
-                INSERT INTO api_keys (id, tenant_id, key_hash, role, name, expires_at)
-                VALUES (:id, :tenant_id, :key_hash, :role, :name,
+                INSERT INTO api_keys (id, tenant_id, key_hash, key_cipher, role, name, expires_at)
+                VALUES (:id, :tenant_id, :key_hash, :key_cipher, :role, :name,
                         CASE WHEN CAST(:days AS INT) IS NULL THEN NULL
                              ELSE NOW() + CAST(:days AS INT) * INTERVAL '1 day' END)
             """),
             {
                 "id": str(key_id), "tenant_id": str(tenant_id),
-                "key_hash": hash_key(raw), "role": role, "name": name,
-                "days": expires_in_days,
+                "key_hash": hash_key(raw), "key_cipher": encrypt_key(raw),
+                "role": role, "name": name, "days": expires_in_days,
             },
         )
         await self.db.commit()
@@ -46,7 +79,7 @@ class ApiKeyRepository:
         """List key metadata for a tenant (never the key/hash), newest first."""
         result = await self.db.execute(
             text("""
-                SELECT id, name, role, is_active, created_at, last_used_at, expires_at
+                SELECT id, name, role, is_active, created_at, last_used_at, expires_at, key_cipher
                 FROM api_keys WHERE tenant_id = :tid
                 ORDER BY created_at DESC
             """),
