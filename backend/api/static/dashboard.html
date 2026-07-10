@@ -78,6 +78,17 @@
   .cite{font-size:12px;color:var(--muted);border-left:3px solid var(--gold);padding-left:11px;margin-top:8px;}
   .muted{color:var(--muted);font-size:13px;}
   .section{scroll-margin-top:20px;}
+  nav a svg{width:17px;height:17px;flex-shrink:0;}
+  .kpi .top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .kpi .ic{width:30px;height:30px;border-radius:8px;background:#EEF1FB;display:flex;align-items:center;justify-content:center;color:var(--blue);flex-shrink:0;}
+  .kpi.gold .ic{background:var(--gold-100);color:#B7860B;}
+  .kpi.green .ic{background:var(--green-bg);color:var(--green);}
+  .kpi.red .ic{background:var(--red-bg);color:var(--red);}
+  .kpi svg{width:16px;height:16px;}
+  .bar{display:flex;height:28px;border-radius:9px;overflow:hidden;background:#EEF0F5;margin-top:10px;}
+  .bar>span{transition:width .5s ease;min-width:0;}
+  .legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px;font-size:12.5px;color:var(--muted);}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:middle;}
 </style>
 </head>
 <body>
@@ -87,10 +98,10 @@
     <div><b>Answer Engine</b><span>Evidence-gated AI</span></div>
   </div>
   <nav id="nav">
-    <a class="active" data-t="overview"><span class="dot"></span><span>Overview</span></a>
-    <a data-t="ask"><span class="dot"></span><span>Ask console</span></a>
-    <a data-t="sources"><span class="dot"></span><span>Sources</span></a>
-    <a data-t="reviews"><span class="dot"></span><span>Review queue</span></a>
+    <a class="active" data-t="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Overview</span></a>
+    <a data-t="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.9-.9L3 21l1.9-5.6A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg><span>Ask console</span></a>
+    <a data-t="sources"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span>Sources</span></a>
+    <a data-t="reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Review queue</span></a>
   </nav>
   <div class="foot">v1.0 · groundstandard</div>
 </aside>
@@ -112,12 +123,27 @@
     <!-- Overview -->
     <div class="view" id="view-overview">
       <div class="kpis">
-        <div class="kpi"><div class="n" id="k-total">–</div><div class="l">Total queries</div></div>
-        <div class="kpi green"><div class="n" id="k-verified">–</div><div class="l">Verified rate</div></div>
-        <div class="kpi gold"><div class="n" id="k-qualified">–</div><div class="l">Qualified rate</div></div>
-        <div class="kpi red"><div class="n" id="k-refused">–</div><div class="l">Refusal rate</div></div>
-        <div class="kpi"><div class="n" id="k-latency">–</div><div class="l">Avg latency</div></div>
+        <div class="kpi"><div class="top"><div class="n" id="k-total">–</div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div></div><div class="l">Total queries</div></div>
+        <div class="kpi green"><div class="top"><div class="n" id="k-verified">–</div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="M22 4 12 14l-3-3"/></svg></div></div><div class="l">Verified rate</div></div>
+        <div class="kpi gold"><div class="top"><div class="n" id="k-qualified">–</div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div></div><div class="l">Qualified rate</div></div>
+        <div class="kpi red"><div class="top"><div class="n" id="k-refused">–</div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg></div></div><div class="l">Refusal rate</div></div>
+        <div class="kpi"><div class="top"><div class="n" id="k-latency">–</div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div></div><div class="l">Avg latency</div></div>
       </div>
+
+      <section class="panel" style="margin-top:20px">
+        <h2>Answer outcomes</h2>
+        <div class="desc">How the tenant's logged queries were decided.</div>
+        <div class="bar" id="bar">
+          <span id="bar-v" style="width:0;background:var(--green)"></span>
+          <span id="bar-q" style="width:0;background:var(--gold)"></span>
+          <span id="bar-r" style="width:0;background:var(--red)"></span>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--green)"></i>Verified <b id="lg-v">0%</b></span>
+          <span><i style="background:var(--gold)"></i>Qualified <b id="lg-q">0%</b></span>
+          <span><i style="background:var(--red)"></i>Refused <b id="lg-r">0%</b></span>
+        </div>
+      </section>
     </div>
 
     <!-- Ask -->
@@ -170,11 +196,14 @@ async function api(path,opts){const r=await fetch(path,opts);const t=await r.tex
 
 async function loadMetrics(){
   try{const m=await api(`/v1/metrics?tenant_id=${tenant()}`);
+    const v=m.verified_rate*100, q=m.qualified_rate*100, r=m.refusal_rate*100;
     $("k-total").textContent=m.total_queries;
-    $("k-verified").textContent=(m.verified_rate*100).toFixed(0)+"%";
-    $("k-qualified").textContent=(m.qualified_rate*100).toFixed(0)+"%";
-    $("k-refused").textContent=(m.refusal_rate*100).toFixed(0)+"%";
+    $("k-verified").textContent=v.toFixed(0)+"%";
+    $("k-qualified").textContent=q.toFixed(0)+"%";
+    $("k-refused").textContent=r.toFixed(0)+"%";
     $("k-latency").textContent=Math.round(m.avg_latency_ms)+" ms";
+    $("bar-v").style.width=v+"%"; $("bar-q").style.width=q+"%"; $("bar-r").style.width=r+"%";
+    $("lg-v").textContent=v.toFixed(0)+"%"; $("lg-q").textContent=q.toFixed(0)+"%"; $("lg-r").textContent=r.toFixed(0)+"%";
   }catch(e){$("k-total").textContent="—";}
 }
 async function loadSources(){
