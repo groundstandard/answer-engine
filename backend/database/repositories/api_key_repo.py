@@ -18,29 +18,37 @@ class ApiKeyRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, tenant_id: UUID, role: str, name: Optional[str]) -> tuple[UUID, str]:
-        """Create a key; returns (id, PLAINTEXT key). Only the hash is stored."""
+    async def create(
+        self, tenant_id: UUID, role: str, name: Optional[str],
+        expires_in_days: Optional[int] = None,
+    ) -> tuple[UUID, str]:
+        """Create a key; returns (id, PLAINTEXT key). Only the hash is stored.
+        expires_in_days=None → never expires (e.g. the owner's key)."""
         raw = generate_key()
         key_id = uuid4()
         await self.db.execute(
             text("""
-                INSERT INTO api_keys (id, tenant_id, key_hash, role, name)
-                VALUES (:id, :tenant_id, :key_hash, :role, :name)
+                INSERT INTO api_keys (id, tenant_id, key_hash, role, name, expires_at)
+                VALUES (:id, :tenant_id, :key_hash, :role, :name,
+                        CASE WHEN CAST(:days AS INT) IS NULL THEN NULL
+                             ELSE NOW() + CAST(:days AS INT) * INTERVAL '1 day' END)
             """),
             {
                 "id": str(key_id), "tenant_id": str(tenant_id),
                 "key_hash": hash_key(raw), "role": role, "name": name,
+                "days": expires_in_days,
             },
         )
         await self.db.commit()
         return key_id, raw
 
     async def verify(self, raw_key: str) -> Optional[dict]:
-        """Resolve an active key to {tenant_id, role}, or None if invalid."""
+        """Resolve an active, non-expired key to {tenant_id, role}, or None."""
         result = await self.db.execute(
             text("""
                 SELECT tenant_id, role FROM api_keys
                 WHERE key_hash = :h AND is_active = TRUE
+                  AND (expires_at IS NULL OR expires_at > NOW())
             """),
             {"h": hash_key(raw_key)},
         )

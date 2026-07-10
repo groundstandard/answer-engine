@@ -2,14 +2,16 @@ import logging
 from uuid import UUID
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from backend.api.deps import require_role
 from backend.database.connection import AsyncSessionLocal
 from backend.database.repositories.review_repo import ReviewRepository
 from backend.database.repositories.audit_repo import AuditRepository
 from backend.database.repositories.tenant_repo import TenantRepository
+from backend.database.repositories.api_key_repo import ApiKeyRepository
 from backend.config.policy_loader import (
     load_policy_config,
     apply_policy_overrides,
@@ -143,6 +145,35 @@ async def freshness(tenant_id: UUID = Query(...)):
             "is_stale": (age is not None and age > _STALE_DAYS) or r.chunks == 0,
         })
     return out
+
+
+class NewKeyRequest(BaseModel):
+    tenant_id: UUID
+    role: str = "api_client"
+    name: Optional[str] = None
+    expires_in_days: Optional[int] = 30  # None = never expires (owner keys)
+
+
+@router.post("/admin/api-keys", status_code=201, dependencies=[Depends(require_role("admin"))])
+async def mint_api_key(body: NewKeyRequest):
+    """Admin-only: generate an API key to hand to a developer (shown once).
+    Authorized by the admin's own session — no service key needed.
+    expires_in_days=null issues a non-expiring key (use only for owners)."""
+    if body.role not in ("admin", "reviewer", "user", "api_client"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+    if body.expires_in_days is not None and body.expires_in_days < 1:
+        raise HTTPException(status_code=400, detail="expires_in_days must be >= 1 or null")
+    try:
+        async with AsyncSessionLocal() as session:
+            key_id, raw = await ApiKeyRepository(session).create(
+                body.tenant_id, body.role, body.name, body.expires_in_days
+            )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Could not create API key: {e}")
+    return {
+        "id": str(key_id), "api_key": raw, "role": body.role, "name": body.name,
+        "expires_in_days": body.expires_in_days,
+    }
 
 
 @router.post("/admin/freshness/scan")
