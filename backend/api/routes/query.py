@@ -10,7 +10,11 @@ from fastapi.responses import StreamingResponse
 from backend.api.schemas.query import QueryRequest, QueryResponse, QueryTraceResponse
 from backend.orchestration.pipeline import PipelineController
 from backend.orchestration.model_client import MODEL_OVERRIDES
-from backend.config.policy_loader import load_policy_config, resolve_profile_for_domain
+from backend.config.policy_loader import (
+    load_policy_config,
+    resolve_profile_for_domain,
+    apply_policy_overrides,
+)
 from backend.database.connection import AsyncSessionLocal
 from backend.database.repositories.query_repo import QueryRepository
 from backend.database.repositories.tenant_repo import TenantRepository
@@ -35,15 +39,19 @@ async def _resolve_policy(request: QueryRequest):
     """
     domain_profile = resolve_profile_for_domain(request.domain_hint)
     tenant_profile = "default"
+    tenant_overrides = {}
     try:
         async with AsyncSessionLocal() as session:
-            tp = await TenantRepository(session).get_policy_profile(request.tenant_id)
+            repo = TenantRepository(session)
+            tp = await repo.get_policy_profile(request.tenant_id)
             if tp:
                 tenant_profile = tp
+            tenant_overrides = await repo.get_policy_overrides(request.tenant_id)
     except Exception as e:  # noqa: BLE001 — tenant lookup is best-effort
         logger.warning("Tenant policy lookup skipped (DB unavailable): %s", e)
 
-    cfg_tenant = load_policy_config(tenant_profile)
+    # Per-tenant calibration overrides layer on top of the tenant's named profile.
+    cfg_tenant = apply_policy_overrides(load_policy_config(tenant_profile), tenant_overrides)
     cfg_domain = load_policy_config(domain_profile)
     if cfg_tenant.minimum_claim_support_ratio >= cfg_domain.minimum_claim_support_ratio:
         return tenant_profile, cfg_tenant

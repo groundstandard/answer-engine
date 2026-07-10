@@ -8,6 +8,7 @@ class DocumentIndexRequest(BaseModel):
     tenant_id: UUID
     content_type: str = "text/plain"
     content: Optional[str] = None
+    pdf_base64: Optional[str] = None  # base64-encoded PDF; text is extracted server-side
     external_url: Optional[str] = None
     title: Optional[str] = None
     metadata: dict = {}

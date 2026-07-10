@@ -21,13 +21,21 @@ def get_indexer() -> DocumentIndexingService:
 async def index_document(request: DocumentIndexRequest):
     """
     Ingest a document into the evidence store for a tenant.
-    Phase 1 accepts inline text content (PRD Section 12: text + PDF ingestion).
+    Accepts inline text ('content') or a base64 PDF ('pdf_base64') — PRD Section 12.
     """
-    if not request.content or not request.content.strip():
+    content = request.content
+    if request.pdf_base64:
+        try:
+            from backend.services.indexing.pdf_extract import extract_text_from_pdf_base64
+            content = extract_text_from_pdf_base64(request.pdf_base64)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=f"Could not read PDF: {e}")
+
+    if not content or not content.strip():
         # PRD 3.1: never silent — reject clearly instead of indexing nothing.
         raise HTTPException(
             status_code=400,
-            detail="Inline 'content' is required. URL fetching is not yet supported.",
+            detail="Provide 'content' or a 'pdf_base64' with extractable text.",
         )
 
     document_id = uuid4()
@@ -38,7 +46,7 @@ async def index_document(request: DocumentIndexRequest):
 
     try:
         result = await get_indexer().index_document(
-            content=request.content,
+            content=content,
             source_id=request.source_id,
             tenant_id=request.tenant_id,
             mime_type=request.content_type,

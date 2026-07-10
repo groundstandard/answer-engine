@@ -19,11 +19,25 @@ _RATE_LIMIT_EXEMPT = ("/health", "/docs", "/openapi.json", "/redoc", "/dashboard
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     try:
         await init_db()
     except Exception as e:
         print(f"[WARN] DB init skipped: {e}")
+
+    monitor_task = None
+    if settings.ENABLE_FRESHNESS_MONITOR:
+        from backend.services.monitoring.freshness_monitor import freshness_monitor_loop
+        monitor_task = asyncio.create_task(freshness_monitor_loop())
+
     yield
+
+    if monitor_task:
+        monitor_task.cancel()
+        try:
+            await monitor_task
+        except asyncio.CancelledError:
+            pass
 
 
 def _setup_observability() -> None:

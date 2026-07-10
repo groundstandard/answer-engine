@@ -33,3 +33,7 @@ class VerificationResultSet:
     contains_contradiction: bool
     critical_claims_supported: bool
     verification_latency_ms: int = 0
+    # Set by the optional cross-evidence contradiction pass: two or more evidence
+    # passages conflict with each other on the query (not just claim-vs-evidence).
+    cross_evidence_conflict: bool = False
+    conflict_explanation: Optional[str] = None

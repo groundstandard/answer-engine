@@ -9,6 +9,13 @@ from sqlalchemy import text
 from backend.database.connection import AsyncSessionLocal
 from backend.database.repositories.review_repo import ReviewRepository
 from backend.database.repositories.audit_repo import AuditRepository
+from backend.database.repositories.tenant_repo import TenantRepository
+from backend.config.policy_loader import (
+    load_policy_config,
+    apply_policy_overrides,
+    clamp_calibratable,
+    CALIBRATABLE_FIELDS,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -138,6 +145,18 @@ async def freshness(tenant_id: UUID = Query(...)):
     return out
 
 
+@router.post("/admin/freshness/scan")
+async def run_freshness_scan():
+    """Run the freshness monitor once now and record FRESHNESS_SCAN audit entries
+    for tenants with stale sources. Returns the number of stale sources found."""
+    try:
+        from backend.services.monitoring.freshness_monitor import scan_stale_sources
+        stale = await scan_stale_sources()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Freshness scan failed: {e}")
+    return {"stale_sources_found": stale}
+
+
 @router.get("/admin/calibration")
 async def calibration(tenant_id: UUID = Query(...)):
     """
@@ -168,3 +187,79 @@ async def calibration(tenant_id: UUID = Query(...)):
     if not hints:
         hints.append("No strong calibration signal yet (need more feedback).")
     return {"by_decision": by_decision, "suggestions": hints}
+
+
+class CalibrationApplyRequest(BaseModel):
+    dry_run: bool = False
+    min_feedback: int = 5  # require at least this many ratings per decision before acting
+
+
+@router.post("/admin/calibration/apply")
+async def apply_calibration(tenant_id: UUID = Query(...), body: CalibrationApplyRequest = CalibrationApplyRequest()):
+    """
+    Active-learning loop: turn the feedback signal into concrete, bounded threshold
+    adjustments and persist them as this tenant's policy_overrides. Set dry_run=true
+    to preview the proposed change without applying it. (PRD active-learning loop.)
+    """
+    sql = """
+        SELECT q.final_decision AS decision, COUNT(f.id) AS n, AVG(f.rating) AS avg_rating
+        FROM query_logs q JOIN feedback f ON f.query_log_id = q.id
+        WHERE q.tenant_id = :tenant_id
+        GROUP BY q.final_decision
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            rows = (await session.execute(text(sql), {"tenant_id": str(tenant_id)})).fetchall()
+            repo = TenantRepository(session)
+            profile = await repo.get_policy_profile(tenant_id) or "default"
+            current = await repo.get_policy_overrides(tenant_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Calibration store unavailable: {e}")
+
+    signal = {r.decision: (int(r.n), float(r.avg_rating) if r.avg_rating is not None else None) for r in rows}
+    # Effective current thresholds (named profile + any existing overrides).
+    eff = apply_policy_overrides(load_policy_config(profile), current)
+
+    proposed = dict(current)
+    changes = []
+
+    def _adjust(field: str, delta: float, why: str):
+        base = getattr(eff, field)
+        new_val = clamp_calibratable(field, base + delta)
+        if field == "minimum_evidence_count":
+            new_val = int(round(new_val))
+        if new_val != base:
+            proposed[field] = new_val
+            changes.append({"field": field, "from": base, "to": new_val, "reason": why})
+
+    v_n, v_rating = signal.get("VERIFIED", (0, None))
+    r_n, r_rating = signal.get("REFUSED", (0, None))
+
+    if v_rating is not None and v_n >= body.min_feedback and v_rating < 3.0:
+        _adjust("minimum_claim_support_ratio", 0.03, "Low ratings on VERIFIED answers — tightening support ratio.")
+        _adjust("minimum_trust_score", 0.05, "Low ratings on VERIFIED answers — requiring more trusted sources.")
+    if r_rating is not None and r_n >= body.min_feedback and r_rating < 3.0:
+        _adjust("minimum_evidence_count", -1, "Low ratings on REFUSED answers — easing evidence-count gate.")
+        _adjust("minimum_claim_support_ratio", -0.03, "Low ratings on REFUSED answers — easing support ratio.")
+
+    if changes and not body.dry_run:
+        try:
+            async with AsyncSessionLocal() as session:
+                await TenantRepository(session).set_policy_overrides(tenant_id, proposed)
+                await AuditRepository(session).write(
+                    event_type="CALIBRATION_APPLIED",
+                    tenant_id=tenant_id,
+                    detail={"changes": changes},
+                )
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=503, detail=f"Could not persist overrides: {e}")
+
+    return {
+        "tenant_id": str(tenant_id),
+        "profile": profile,
+        "applied": bool(changes) and not body.dry_run,
+        "dry_run": body.dry_run,
+        "changes": changes,
+        "resulting_overrides": proposed,
+        "note": "No change — insufficient signal." if not changes else None,
+    }

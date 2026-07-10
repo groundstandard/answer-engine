@@ -53,6 +53,25 @@ class PolicyEngine:
                 PolicyDecisionType.REFUSE_INSUFFICIENT_EVIDENCE,
             )
 
+        # Gate 4a: Cross-evidence conflict (sources disagree with each other).
+        if getattr(verification_results, "cross_evidence_conflict", False):
+            reason_codes.append("CROSS_EVIDENCE_CONFLICT")
+            if policy_config.escalate_on_authoritative_conflict:
+                return PolicyDecision(
+                    decision=PolicyDecisionType.ESCALATE_HUMAN_REVIEW,
+                    reason_codes=reason_codes + ["AUTHORITATIVE_SOURCE_CONFLICT"],
+                    allowed_response_type="NONE",
+                    escalation_required=True,
+                    confidence_summary="Evidence sources contradict each other.",
+                )
+            return PolicyDecision(
+                decision=PolicyDecisionType.ANSWER_QUALIFIED,
+                reason_codes=reason_codes,
+                allowed_response_type="PARTIAL",
+                escalation_required=False,
+                confidence_summary="Sources disagree; answer qualified.",
+            )
+
         # Gate 4: Contradiction check
         contradicted = [
             r

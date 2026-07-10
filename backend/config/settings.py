@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     ENABLE_COST_ROUTING: bool = True
     COST_ROUTING_RISK_THRESHOLD: float = 0.4
 
+    # Extra cross-evidence contradiction pass (one LLM call) before the policy gate.
+    ENABLE_CONTRADICTION_CHECK: bool = False
+    # Background freshness monitor: periodically flags stale sources into the audit log.
+    ENABLE_FRESHNESS_MONITOR: bool = False
+    FRESHNESS_CHECK_INTERVAL_MIN: int = 60
+    FRESHNESS_STALE_DAYS: int = 30
+
     LOG_LEVEL: str = "INFO"
     SENTRY_DSN: str = ""
 

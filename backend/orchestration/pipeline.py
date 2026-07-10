@@ -18,6 +18,7 @@ class PipelineController:
         from backend.services.retrieval.retriever import RetrievalService
         from backend.services.claims.extractor import ClaimExtractionService
         from backend.services.verification.verifier import ClaimVerificationService
+        from backend.services.verification.contradiction_checker import ContradictionChecker
         from backend.services.policy.engine import PolicyEngine
         from backend.services.composition.composer import ResponseComposer
         from backend.orchestration.model_client import ModelClient
@@ -27,6 +28,7 @@ class PipelineController:
         self.retriever = RetrievalService()
         self.claim_extractor = ClaimExtractionService(self.model_client)
         self.verifier = ClaimVerificationService(self.model_client)
+        self.contradiction_checker = ContradictionChecker(self.model_client)
         self.policy_engine = PolicyEngine()
         self.composer = ResponseComposer(self.model_client)
 
@@ -102,6 +104,17 @@ class PipelineController:
                 for r in verification_results.claim_results
             ],
         })
+
+        # Stage 4b: Cross-evidence contradiction pass (optional, one LLM call).
+        if settings.ENABLE_CONTRADICTION_CHECK:
+            conflict, explanation = await self.contradiction_checker.check(
+                query=query, evidence_bundle=evidence_bundle,
+            )
+            if conflict:
+                verification_results.cross_evidence_conflict = True
+                verification_results.conflict_explanation = explanation
+                verification_results.contains_contradiction = True
+            await self._emit(on_event, "contradiction", {"conflict": conflict})
 
         # Stage 5: Policy Decision
         policy_decision = self.policy_engine.apply_policy(
