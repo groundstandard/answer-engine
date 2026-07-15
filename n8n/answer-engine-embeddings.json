@@ -21,12 +21,6 @@
         "url": "https://api.openai.com/v1/embeddings",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "openAiApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "OpenAI-Organization", "value": "org-ZoW98yuMq15DAXClnOsJBZN8" }
-          ]
-        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.body.input }) }}",
