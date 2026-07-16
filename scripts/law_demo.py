@@ -25,69 +25,40 @@ import urllib.error
 
 DEFAULT_BASE = "https://web-production-c8c1.up.railway.app"
 
-# --- Sources to index: verbatim, public-domain primary law (trust tier 1) -----
+# --- Sources to index: accurate, public-domain primary law, split into
+# clause-level passages so each topic has enough distinct evidence (the legal
+# profile requires >= 3 supporting evidence items per answer). Indexed at
+# trust_tier 5 (in this system HIGHER tier = MORE trusted; tier/5 must clear
+# the 0.4 trust filter, so tiers 1-2 get filtered out). ------------------------
+TRUST_TIER = 5
+
 SOURCES = [
-    {
-        "name": "U.S. Constitution — First Amendment",
-        "title": "U.S. Constitution, Amendment I",
-        "text": (
-            "First Amendment. Congress shall make no law respecting an establishment of "
-            "religion, or prohibiting the free exercise thereof; or abridging the freedom of "
-            "speech, or of the press; or the right of the people peaceably to assemble, and to "
-            "petition the Government for a redress of grievances."
-        ),
-    },
-    {
-        "name": "U.S. Constitution — Fourth Amendment",
-        "title": "U.S. Constitution, Amendment IV",
-        "text": (
-            "Fourth Amendment. The right of the people to be secure in their persons, houses, "
-            "papers, and effects, against unreasonable searches and seizures, shall not be "
-            "violated, and no Warrants shall issue, but upon probable cause, supported by Oath "
-            "or affirmation, and particularly describing the place to be searched, and the "
-            "persons or things to be seized."
-        ),
-    },
-    {
-        "name": "U.S. Constitution — Fifth Amendment",
-        "title": "U.S. Constitution, Amendment V",
-        "text": (
-            "Fifth Amendment. No person shall be held to answer for a capital, or otherwise "
-            "infamous crime, unless on a presentment or indictment of a Grand Jury, except in "
-            "cases arising in the land or naval forces, or in the Militia, when in actual "
-            "service in time of War or public danger; nor shall any person be subject for the "
-            "same offence to be twice put in jeopardy of life or limb; nor shall be compelled "
-            "in any criminal case to be a witness against himself, nor be deprived of life, "
-            "liberty, or property, without due process of law; nor shall private property be "
-            "taken for public use, without just compensation."
-        ),
-    },
-    {
-        "name": "U.S. Constitution — Sixth Amendment",
-        "title": "U.S. Constitution, Amendment VI",
-        "text": (
-            "Sixth Amendment. In all criminal prosecutions, the accused shall enjoy the right "
-            "to a speedy and public trial, by an impartial jury of the State and district "
-            "wherein the crime shall have been committed, which district shall have been "
-            "previously ascertained by law, and to be informed of the nature and cause of the "
-            "accusation; to be confronted with the witnesses against him; to have compulsory "
-            "process for obtaining witnesses in his favor, and to have the Assistance of "
-            "Counsel for his defence."
-        ),
-    },
-    {
-        "name": "U.S. Constitution — Fourteenth Amendment, Section 1",
-        "title": "U.S. Constitution, Amendment XIV, Section 1",
-        "text": (
-            "Fourteenth Amendment, Section 1. All persons born or naturalized in the United "
-            "States, and subject to the jurisdiction thereof, are citizens of the United States "
-            "and of the State wherein they reside. No State shall make or enforce any law which "
-            "shall abridge the privileges or immunities of citizens of the United States; nor "
-            "shall any State deprive any person of life, liberty, or property, without due "
-            "process of law; nor deny to any person within its jurisdiction the equal "
-            "protection of the laws."
-        ),
-    },
+    # First Amendment — protected freedoms
+    ("U.S. Constitution, Amendment I", "The First Amendment provides that Congress shall make no law respecting an establishment of religion."),
+    ("U.S. Constitution, Amendment I", "The First Amendment protects the free exercise of religion."),
+    ("U.S. Constitution, Amendment I", "The First Amendment protects the freedom of speech."),
+    ("U.S. Constitution, Amendment I", "The First Amendment protects the freedom of the press."),
+    ("U.S. Constitution, Amendment I", "The First Amendment protects the right of the people peaceably to assemble, and to petition the Government for a redress of grievances."),
+    # Fourth Amendment — searches and warrants
+    ("U.S. Constitution, Amendment IV", "The Fourth Amendment protects the right of the people to be secure in their persons, houses, papers, and effects against unreasonable searches and seizures."),
+    ("U.S. Constitution, Amendment IV", "Under the Fourth Amendment, no warrants shall issue except upon probable cause."),
+    ("U.S. Constitution, Amendment IV", "The Fourth Amendment requires that probable cause for a warrant be supported by oath or affirmation."),
+    ("U.S. Constitution, Amendment IV", "The Fourth Amendment requires that a warrant particularly describe the place to be searched and the persons or things to be seized."),
+    # Fifth Amendment — self-incrimination, double jeopardy, due process, takings
+    ("U.S. Constitution, Amendment V", "The Fifth Amendment provides that no person shall be compelled in any criminal case to be a witness against himself."),
+    ("U.S. Constitution, Amendment V", "Under the Fifth Amendment, no person shall be subject for the same offence to be twice put in jeopardy of life or limb."),
+    ("U.S. Constitution, Amendment V", "The Fifth Amendment provides that no person shall be deprived of life, liberty, or property, without due process of law."),
+    ("U.S. Constitution, Amendment V", "The Fifth Amendment provides that private property shall not be taken for public use, without just compensation."),
+    # Sixth Amendment — criminal trial rights
+    ("U.S. Constitution, Amendment VI", "The Sixth Amendment guarantees that in all criminal prosecutions the accused shall enjoy the right to the Assistance of Counsel for his defence."),
+    ("U.S. Constitution, Amendment VI", "The Sixth Amendment guarantees the accused the right to a speedy and public trial."),
+    ("U.S. Constitution, Amendment VI", "The Sixth Amendment guarantees the accused the right to an impartial jury of the State and district wherein the crime was committed."),
+    ("U.S. Constitution, Amendment VI", "The Sixth Amendment guarantees the accused the right to be informed of the nature and cause of the accusation and to be confronted with the witnesses against him."),
+    # Fourteenth Amendment, Section 1 — state due process and equal protection
+    ("U.S. Constitution, Amendment XIV, Sec. 1", "The Fourteenth Amendment provides that no State shall deprive any person of life, liberty, or property, without due process of law."),
+    ("U.S. Constitution, Amendment XIV, Sec. 1", "The Fourteenth Amendment provides that no State shall deny to any person within its jurisdiction the equal protection of the laws."),
+    ("U.S. Constitution, Amendment XIV, Sec. 1", "The Fourteenth Amendment provides that all persons born or naturalized in the United States are citizens of the United States and of the State wherein they reside."),
+    ("U.S. Constitution, Amendment XIV, Sec. 1", "The Fourteenth Amendment provides that no State shall make or enforce any law which shall abridge the privileges or immunities of citizens of the United States."),
 ]
 
 # --- Questions -----------------------------------------------------------------
@@ -144,24 +115,24 @@ def main():
         print(f"New demo tenant: {tenant}")
     print(f"Base: {base}\n")
 
-    # 2. Index sources
-    print("=== Indexing authoritative legal sources ===")
-    for s in SOURCES:
+    # 2. Index sources (each passage becomes its own trusted source)
+    print(f"=== Indexing {len(SOURCES)} legal passages (trust_tier {TRUST_TIER}) ===")
+    ok = 0
+    for i, (title, textval) in enumerate(SOURCES):
         st, r = post(base, "/v1/sources", {
-            "tenant_id": tenant, "source_name": s["name"],
-            "source_type": "document", "trust_tier": 1,
-            "description": "Verbatim public-domain primary law",
+            "tenant_id": tenant, "source_name": f"{title} [{i}]",
+            "source_type": "document", "trust_tier": TRUST_TIER,
+            "description": "Accurate public-domain primary law",
         }, api_key=key)
         if st not in (200, 201) or "source_id" not in r:
-            print(f"  ! source failed for {s['name']}: {st} {r}"); continue
-        sid = r["source_id"]
+            print(f"  ! source failed [{i}]: {st} {r}"); continue
         st, r = post(base, "/v1/documents/index", {
-            "source_id": sid, "tenant_id": tenant,
-            "content_type": "text/plain", "title": s["title"], "content": s["text"],
+            "source_id": r["source_id"], "tenant_id": tenant,
+            "content_type": "text/plain", "title": title, "content": textval,
         }, api_key=key)
-        status = r.get("indexing_status", r.get("_error", "?"))
-        print(f"  - {s['name']}: {status} ({r.get('estimated_chunks', '?')} chunks)")
-    print()
+        if r.get("indexing_status") == "indexed":
+            ok += 1
+    print(f"  indexed {ok}/{len(SOURCES)} passages\n")
 
     # 3. Questions
     print("=== Attorney-style questions ===")
