@@ -40,7 +40,7 @@
   .tenant label{font-size:12px;color:var(--muted);}
   .tenant input{border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:300px;
         font-size:12px;font-family:ui-monospace,monospace;color:var(--ink);background:#fff;}
-  .wrap{padding:24px 28px;max-width:1080px;width:100%;display:grid;gap:22px;}
+  .wrap{padding:24px 28px;max-width:none;width:100%;display:grid;gap:22px;}
   /* kpi cards */
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;
@@ -81,7 +81,12 @@
   .tbl th{text-align:left;color:var(--muted);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:9px 10px;border-bottom:1px solid var(--line);}
   .tbl td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
   .tbl tr:last-child td{border-bottom:none;}
-  .tbl td.q{max-width:420px;font-weight:600;}
+  .tbl td.q{max-width:560px;font-weight:600;}
+  .qrow{cursor:pointer;} .qrow:hover{background:#F7F8FC;}
+  .caret{display:inline-block;transition:.15s;color:var(--muted);margin-right:7px;font-size:11px;}
+  .caret.open{transform:rotate(90deg);}
+  .qdetail>td{background:#FBFCFE;padding:2px 12px 15px;}
+  .qd-answer{line-height:1.55;font-size:13px;padding:9px 0;color:var(--ink);}
   .pager{display:flex;align-items:center;gap:12px;margin-top:15px;}
   .pager button[disabled]{opacity:.4;cursor:not-allowed;}
   .sel{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;background:#fff;color:var(--ink);}
@@ -241,7 +246,7 @@
     <div class="view" id="view-queries" hidden>
       <section class="panel">
         <h2>Query log</h2>
-        <div class="desc">Every query run through the pipeline, newest first.</div>
+        <div class="desc">Every query run through the pipeline, newest first. Click a row to see the full answer and citations.</div>
         <div style="overflow-x:auto"><table class="tbl">
           <thead><tr><th>Query</th><th>Decision</th><th>Profile</th><th>Latency</th><th>When</th></tr></thead>
           <tbody id="queriesBody"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
@@ -418,17 +423,37 @@ let qOffset=0;const qLimit=10;let qTotal=0;
 async function loadQueries(){
   try{const p=await api(`/v1/metrics/queries?tenant_id=${tenant()}&limit=${qLimit}&offset=${qOffset}`);
     qTotal=p.total;
-    $("queriesBody").innerHTML=p.items.length?p.items.map(x=>`<tr>
-      <td class="q">${esc(x.query_text)}</td>
+    $("queriesBody").innerHTML=p.items.length?p.items.map(x=>`<tr class="qrow" onclick="toggleQ('${x.id}',this)">
+      <td class="q"><span class="caret">▸</span>${esc(x.query_text)}</td>
       <td>${badge(x.final_decision)}</td>
       <td class="muted">${x.policy_profile||'—'}</td>
       <td class="muted">${x.latency_ms!=null?x.latency_ms+' ms':'—'}</td>
-      <td class="muted">${(x.created_at||'').slice(0,19).replace('T',' ')}</td></tr>`).join("")
+      <td class="muted">${(x.created_at||'').slice(0,19).replace('T',' ')}</td></tr>
+      <tr class="qdetail" id="qd-${x.id}" hidden><td colspan="5"><div class="qd-inner muted">Loading…</div></td></tr>`).join("")
       :`<tr><td colspan="5" class="muted">No queries yet.</td></tr>`;
     const from=qTotal?qOffset+1:0,to=Math.min(qOffset+qLimit,qTotal);
     $("q-pageinfo").textContent=`${from}–${to} of ${qTotal}`;
     $("q-prev").disabled=qOffset<=0;$("q-next").disabled=qOffset+qLimit>=qTotal;
   }catch(e){$("queriesBody").innerHTML=`<tr><td colspan="5" class="muted">${e.message}</td></tr>`;}
+}
+function toggleQ(id,rowEl){
+  const d=$("qd-"+id); if(!d)return;
+  const caret=rowEl.querySelector('.caret');
+  if(d.hidden){ d.hidden=false; if(caret)caret.classList.add('open');
+    if(!d.dataset.loaded)loadQueryDetail(id); }
+  else { d.hidden=true; if(caret)caret.classList.remove('open'); }
+}
+async function loadQueryDetail(id){
+  const d=$("qd-"+id); const cell=d.querySelector('.qd-inner');
+  try{
+    const r=await api(`/v1/query/${id}`);
+    const fr=r.final_response||{};
+    const cites=(fr.citations||[]).map(c=>`<div class="cite">${esc(c.source_name)}: ${esc(c.snippet||'')}</div>`).join("")
+      ||`<div class="muted" style="margin-top:8px">No citations.</div>`;
+    cell.className="";
+    cell.innerHTML=`<div class="qd-answer">${badge(fr.final_decision)} <span style="margin-left:6px">${esc(fr.response_text||fr.refusal_reason||'—')}</span></div>${cites}`;
+    d.dataset.loaded="1";
+  }catch(e){cell.innerHTML=`<span class="muted">${e.message}</span>`;}
 }
 function queriesPage(dir){qOffset=Math.max(0,qOffset+dir*qLimit);loadQueries();}
 function showBusy(m){$("busyMsg").textContent=m||"Working…";$("busy").hidden=false;}
@@ -538,7 +563,7 @@ function startAuto(){
     const t=active?active.dataset.t:'overview';
     if(t==='sources')loadSources();
     else if(t==='reviews')loadReviews();
-    else if(t==='queries')loadQueries();
+    else if(t==='queries' && !document.querySelector('.qdetail:not([hidden])'))loadQueries();
     else if(t==='keys')loadKeys();
   }, 7000);
 }
