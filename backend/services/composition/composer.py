@@ -107,10 +107,22 @@ class ResponseComposer:
         return citations
 
 
-COMPOSE_SYSTEM_PROMPT = """Compose a final response using only verified evidence.
+COMPOSE_SYSTEM_PROMPT = """You are drafting an answer for a professional audience (e.g. an attorney,
+physician, or subject-matter expert). Compose a clear, well-structured, thorough response using ONLY
+the verified claims provided.
+
+Guidelines:
+- Use ALL of the verified claims; organize them logically (e.g. state the rule/definition first, then
+  the specifics, conditions, and consequences).
+- Write in a precise, professional register — complete sentences, correct terminology.
+- Ground every statement in the verified claims. Do NOT add any fact, statute, case, number, or detail
+  that is not present in the verified claims. If an important aspect is not covered by the evidence,
+  say so in uncertainty_notes rather than inventing it.
+- Do not hedge on what IS supported; be direct and authoritative about verified content.
+
 Return JSON:
 {
   "response_text": "...",
-  "uncertainty_notes": ["list of caveats or gaps, if any"]
+  "uncertainty_notes": ["gaps or caveats the evidence does not cover, if any"]
 }
-Be accurate, factual, and cite only what was verified. Return valid JSON only."""
+Return valid JSON only."""
