@@ -193,11 +193,12 @@ class PipelineController:
             await on_event(stage, data)
 
     @staticmethod
-    def _is_abstention(draft_answer: str) -> bool:
-        """True when the drafted answer declines to answer from the evidence."""
+    def _is_abstention(draft_answer) -> bool:
+        """True when the drafted answer declines to answer from the evidence.
+        The draft may arrive as a str or a structured dict/list, so coerce first."""
         if not draft_answer:
             return True
-        text = draft_answer.lower()
+        text = (draft_answer if isinstance(draft_answer, str) else str(draft_answer)).lower()
         return any(marker in text for marker in _ABSTENTION_MARKERS)
 
     def _apply_cost_routing(self, classification) -> None:
