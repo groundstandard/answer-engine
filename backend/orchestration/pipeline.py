@@ -184,11 +184,19 @@ class PipelineController:
                 escalation_required=False,
                 confidence_summary="The evidence does not answer the question.",
             )
-        # Jurisdiction/context guard: a verified answer that itself says the result
-        # varies by state / depends on jurisdiction is context-dependent — qualify it.
+        # Jurisdiction/context guard: if the answer or its supporting evidence says
+        # the result varies by state / depends on jurisdiction, a flat VERIFIED
+        # overstates confidence — qualify it. Checking the evidence text (our own
+        # indexed sources) is deterministic, unlike the model's phrasing.
         elif (
             policy_decision.decision == PolicyDecisionType.ANSWER_VERIFIED
-            and self._depends_on_context(draft_answer)
+            and (
+                self._depends_on_context(draft_answer)
+                or any(
+                    self._depends_on_context(getattr(e, "content", ""))
+                    for e in evidence_bundle.evidence_items
+                )
+            )
         ):
             policy_decision = PolicyDecision(
                 decision=PolicyDecisionType.ANSWER_QUALIFIED,
