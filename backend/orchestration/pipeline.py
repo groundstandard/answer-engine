@@ -208,6 +208,13 @@ class PipelineController:
             draft_answer=draft_answer,
         )
 
+        # Post-composition safety net: the composer may surface jurisdiction/state
+        # variance that the draft didn't, so re-check the final text and qualify a
+        # VERIFIED answer that actually depends on unspecified context.
+        if final_response.final_decision == "VERIFIED" and self._depends_on_context(final_response.response_text):
+            final_response.final_decision = "QUALIFIED"
+            final_response.confidence_summary = "Answer depends on jurisdiction or context not specified in the question."
+
         final_response.latency_ms = int((time.monotonic() - pipeline_start) * 1000)
         final_response.trace_id = trace_id
         return final_response
