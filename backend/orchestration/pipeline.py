@@ -21,6 +21,18 @@ _ABSTENTION_MARKERS = (
     "evidence provided does not", "evidence does not", "no evidence",
 )
 
+# When the answer itself says the result depends on unspecified jurisdiction or
+# varies by state, a flat VERIFIED overstates confidence — it should be QUALIFIED
+# so the caveat is surfaced (Bobby's jurisdiction-ambiguity category).
+_CONTEXT_DEPENDENT_MARKERS = (
+    "varies by state", "varies by jurisdiction", "vary by state", "vary by jurisdiction",
+    "depends on the jurisdiction", "depends on the state", "depends on your state",
+    "depending on the state", "depending on the jurisdiction", "depending on your",
+    "differs by state", "differ by state", "state-by-state", "state by state",
+    "some states", "other states", "one-party consent", "two-party consent",
+    "all-party consent",
+)
+
 
 class PipelineController:
     """
@@ -172,6 +184,19 @@ class PipelineController:
                 escalation_required=False,
                 confidence_summary="The evidence does not answer the question.",
             )
+        # Jurisdiction/context guard: a verified answer that itself says the result
+        # varies by state / depends on jurisdiction is context-dependent — qualify it.
+        elif (
+            policy_decision.decision == PolicyDecisionType.ANSWER_VERIFIED
+            and self._depends_on_context(draft_answer)
+        ):
+            policy_decision = PolicyDecision(
+                decision=PolicyDecisionType.ANSWER_QUALIFIED,
+                reason_codes=(policy_decision.reason_codes or []) + ["CONTEXT_DEPENDENT"],
+                allowed_response_type="PARTIAL",
+                escalation_required=False,
+                confidence_summary="Answer depends on jurisdiction or context not specified in the question.",
+            )
         await self._emit(on_event, "policy", {"decision": policy_decision.decision.value})
 
         # Stage 6: Response Composition
@@ -200,6 +225,14 @@ class PipelineController:
             return True
         text = (draft_answer if isinstance(draft_answer, str) else str(draft_answer)).lower()
         return any(marker in text for marker in _ABSTENTION_MARKERS)
+
+    @staticmethod
+    def _depends_on_context(draft_answer) -> bool:
+        """True when the answer itself says the result varies by jurisdiction/state."""
+        if not draft_answer:
+            return False
+        text = (draft_answer if isinstance(draft_answer, str) else str(draft_answer)).lower()
+        return any(marker in text for marker in _CONTEXT_DEPENDENT_MARKERS)
 
     def _apply_cost_routing(self, classification) -> None:
         """Route generation tasks to the cheaper model when the query is low-risk.
