@@ -10,8 +10,8 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [-640, 0],
-      "id": "c3000000-0000-0000-0000-000000000001",
+      "position": [-240, 64],
+      "id": "4350ca00-3ace-4d8a-ad8b-bc9fe598cdbc",
       "name": "Webhook",
       "webhookId": "answer-engine-embed-webhook"
     },
@@ -24,31 +24,34 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.body.input }) }}",
-        "options": {}
+        "options": { "timeout": 30000 }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [-400, 0],
-      "id": "c3000000-0000-0000-0000-000000000002",
+      "position": [16, 64],
+      "id": "4f8de9e0-929d-48ac-9d3f-0d9080dcc26d",
       "name": "OpenAI Embeddings",
-      "credentials": { "openAiApi": { "id": "XK8rP9sQUaUTSp4n", "name": "OpenAi account" } }
+      "credentials": { "openAiApi": { "id": "lEsQgAt3pCckxzok", "name": "OpenAI account 2" } },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 2000
     },
     {
       "parameters": {
-        "jsCode": "// The Answer Engine expects { \"embeddings\": [[...], [...]] } in the SAME order\n// as the input array. OpenAI returns { data: [ { index, embedding }, ... ] }.\nconst r = $json || {};\nconst data = Array.isArray(r.data) ? r.data.slice() : [];\ndata.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));\nreturn [{ json: { embeddings: data.map(d => d.embedding) } }];"
+        "jsCode": "// The Answer Engine expects { \"embeddings\": [[...], [...]] } in the SAME order\n// as the input array. OpenAI returns { data: [ { index, embedding }, ... ] }.\n// Guard: if the OpenAI call returned no data, surface an error instead of an\n// empty 200 (an empty body silently degrades retrieval on the caller side).\nconst r = $json || {};\nconst data = Array.isArray(r.data) ? r.data.slice() : [];\nif (!data.length) { throw new Error('OpenAI returned no embedding data'); }\ndata.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));\nreturn [{ json: { embeddings: data.map(d => d.embedding) } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-160, 0],
-      "id": "c3000000-0000-0000-0000-000000000003",
+      "position": [240, 64],
+      "id": "7eadbffb-0879-4dd9-9aa7-670f8e5d7521",
       "name": "Build Response"
     },
     {
       "parameters": { "respondWith": "firstIncomingItem", "options": {} },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [80, 0],
-      "id": "c3000000-0000-0000-0000-000000000004",
+      "position": [480, 64],
+      "id": "d2a40a73-8fbe-4f7f-ae04-5fe1fdc07ace",
       "name": "Respond to Webhook"
     }
   ],
@@ -58,5 +61,5 @@
     "Build Response": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
   },
   "pinData": {},
-  "meta": { "templateCredsSetupCompleted": true }
+  "meta": { "instanceId": "2da7974997d5541651eba5e062fe06cce1409a046aaedad7068366bfaecc4d56" }
 }
