@@ -95,9 +95,11 @@
   .qmodal-x{background:none;color:var(--muted);border:0;font-size:24px;line-height:1;cursor:pointer;padding:0 2px;}
   .qmodal-x:hover{color:var(--ink);background:none;}
   .qmodal-body{padding:18px 22px;overflow-y:auto;}
-  .qm-meta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;font-size:12px;color:var(--muted);margin:2px 0 16px;}
+  .qm-meta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;font-size:12px;color:var(--muted);margin:2px 0 18px;}
+  .qm-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:18px 0 7px;}
+  .qm-question{font-size:14.5px;font-weight:600;color:var(--navy);line-height:1.45;}
   .qm-answer{line-height:1.6;font-size:14px;color:var(--ink);}
-  .qm-cites-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:20px 0 9px;}
+  .qm-conf{font-size:12px;color:var(--muted);margin-top:9px;font-style:italic;}
   .pager{display:flex;align-items:center;gap:12px;margin-top:15px;}
   .pager button[disabled]{opacity:.4;cursor:not-allowed;}
   .sel{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;background:#fff;color:var(--ink);}
@@ -443,10 +445,11 @@ async function loadReviews(){
       <div class="row" style="margin-top:9px"><button class="sm" onclick="resolve('${x.id}','resolved')">Resolve</button>
       <button class="ghost sm" onclick="resolve('${x.id}','dismissed')">Dismiss</button></div></div>`).join(""):`<div class="muted">No pending reviews.</div>`;
   }catch(e){$("reviewsList").innerHTML=`<div class="muted">${e.message}</div>`;}}
-let qOffset=0;const qLimit=10;let qTotal=0;
+let qOffset=0;const qLimit=10;let qTotal=0;let qItems={};
 async function loadQueries(){
   try{const p=await api(`/v1/metrics/queries?tenant_id=${tenant()}&limit=${qLimit}&offset=${qOffset}`);
     qTotal=p.total;
+    qItems={}; p.items.forEach(x=>{qItems[x.id]=x;});
     $("queriesBody").innerHTML=p.items.length?p.items.map(x=>`<tr class="qrow" onclick="openQueryModal('${x.id}')">
       <td class="q">${esc(x.query_text)}</td>
       <td>${badge(x.final_decision)}</td>
@@ -461,21 +464,32 @@ async function loadQueries(){
 }
 async function openQueryModal(id){
   $("qmodal").hidden=false;
-  $("qm-title").textContent="Loading…";
+  $("qm-title").textContent="Query detail";
   $("qm-body").innerHTML='<div class="muted">Loading…</div>';
+  const it=qItems[id]||{};
   try{
     const r=await api(`/v1/query/${id}`);
     const fr=r.final_response||{};
-    const when=(r.created_at||'').slice(0,19).replace('T',' ');
-    const cites=(fr.citations||[]).map(c=>`<div class="cite">${esc(c.source_name)}: ${esc(c.snippet||'')}</div>`).join("")
+    const q=r.query_text||it.query_text||'—';
+    const decision=fr.final_decision||it.final_decision;
+    const profile=it.policy_profile||'—';
+    const latency=(fr.latency_ms!=null?fr.latency_ms:it.latency_ms);
+    const when=(r.created_at||it.created_at||'').slice(0,19).replace('T',' ');
+    const notes=(fr.uncertainty_notes||[]);
+    const cites=(fr.citations||[]).map(c=>`<div class="cite"><b>${esc(c.source_name)}</b>${c.trust_tier?` · tier ${c.trust_tier}`:''}<br>${esc(c.snippet||'')}</div>`).join("")
       ||'<div class="muted">No citations.</div>';
-    $("qm-title").textContent=r.query_text||"Query";
     $("qm-body").innerHTML=`
-      <div class="qm-meta">${badge(fr.final_decision)}
-        ${fr.confidence_summary?`<span>${esc(fr.confidence_summary)}</span>`:''}
-        <span>${when}</span></div>
+      <div class="qm-label">Question</div>
+      <div class="qm-question">${esc(q)}</div>
+      <div class="qm-meta">${badge(decision)}
+        <span>profile: ${esc(profile)}</span>
+        ${latency!=null?`<span>${latency} ms</span>`:''}
+        ${when?`<span>${when}</span>`:''}</div>
+      <div class="qm-label">Answer</div>
       <div class="qm-answer">${esc(fr.response_text||fr.refusal_reason||'—')}</div>
-      <div class="qm-cites-title">Citations</div>${cites}`;
+      ${fr.confidence_summary?`<div class="qm-conf">${esc(fr.confidence_summary)}</div>`:''}
+      ${notes.length?`<div class="qm-label">Uncertainty notes</div>`+notes.map(n=>`<div class="cite">${esc(n)}</div>`).join(""):''}
+      <div class="qm-label">Citations</div>${cites}`;
   }catch(e){$("qm-body").innerHTML=`<div class="muted">${e.message}</div>`;}
 }
 function closeQueryModal(){$("qmodal").hidden=true;}
