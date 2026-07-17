@@ -1,3 +1,4 @@
+import json
 import logging
 from uuid import UUID
 from typing import Optional, Dict, List
@@ -121,6 +122,47 @@ async def list_queries(
         ],
         total=total, limit=limit, offset=offset,
     )
+
+
+class QueryGroup(BaseModel):
+    query_text: str
+    runs: int
+    policy_profile: Optional[str] = None
+    last_at: str
+    run_list: List[dict]
+
+
+class QueryGroupPage(BaseModel):
+    items: List[QueryGroup]
+    total: int
+    limit: int
+    offset: int
+
+
+@router.get("/metrics/queries/grouped", response_model=QueryGroupPage)
+async def list_queries_grouped(
+    tenant_id: UUID = Query(..., description="Tenant to list grouped query logs for"),
+    limit: int = Query(25, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """One row per distinct question; every run collapsed into run_list (newest first)."""
+    try:
+        async with AsyncSessionLocal() as session:
+            repo = QueryRepository(session)
+            rows = await repo.list_grouped_for_tenant(tenant_id, limit, offset)
+            total = await repo.count_distinct_for_tenant(tenant_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Query store unavailable: {e}")
+    items = []
+    for r in rows:
+        rl = r["run_list"]
+        if isinstance(rl, str):
+            rl = json.loads(rl)
+        items.append(QueryGroup(
+            query_text=r["query_text"], runs=r["runs"],
+            policy_profile=r["policy_profile"], last_at=str(r["last_at"]), run_list=rl,
+        ))
+    return QueryGroupPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/metrics/sources", response_model=List[SourceUsage])

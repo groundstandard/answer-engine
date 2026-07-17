@@ -87,7 +87,7 @@
   .qmodal-overlay{position:fixed;inset:0;background:rgba(18,13,66,.45);display:flex;align-items:center;
         justify-content:center;z-index:120;backdrop-filter:blur(2px);padding:20px;}
   .qmodal-overlay[hidden]{display:none;}
-  .qmodal{background:#fff;border-radius:16px;width:min(720px,94vw);max-height:86vh;display:flex;
+  .qmodal{background:#fff;border-radius:16px;width:min(960px,95vw);max-height:88vh;display:flex;
         flex-direction:column;box-shadow:0 24px 70px rgba(18,13,66,.32);animation:pop .16s ease;overflow:hidden;}
   .qmodal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
         padding:18px 22px;border-bottom:1px solid var(--line);}
@@ -100,6 +100,10 @@
   .qm-question{font-size:14.5px;font-weight:600;color:var(--navy);line-height:1.45;}
   .qm-answer{line-height:1.6;font-size:14px;color:var(--ink);}
   .qm-conf{font-size:12px;color:var(--muted);margin-top:9px;font-style:italic;}
+  .qm-run{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#FBFCFE;}
+  .qm-run-head{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--navy);margin-bottom:9px;flex-wrap:wrap;}
+  .qm-run-head .muted{font-weight:400;}
+  .qm-cites-lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:12px 0 7px;}
   .pager{display:flex;align-items:center;gap:12px;margin-top:15px;}
   .pager button[disabled]{opacity:.4;cursor:not-allowed;}
   .sel{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;background:#fff;color:var(--ink);}
@@ -261,7 +265,7 @@
         <h2>Query log</h2>
         <div class="desc">Every query run through the pipeline, newest first. Click a row to see the full answer and citations.</div>
         <div style="overflow-x:auto"><table class="tbl">
-          <thead><tr><th>Query</th><th>Decision</th><th>Profile</th><th>Latency</th><th>When</th></tr></thead>
+          <thead><tr><th>Query</th><th>Decision</th><th>Profile</th><th>Runs</th><th>Last run</th></tr></thead>
           <tbody id="queriesBody"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
         </table></div>
         <div class="pager">
@@ -445,51 +449,55 @@ async function loadReviews(){
       <div class="row" style="margin-top:9px"><button class="sm" onclick="resolve('${x.id}','resolved')">Resolve</button>
       <button class="ghost sm" onclick="resolve('${x.id}','dismissed')">Dismiss</button></div></div>`).join(""):`<div class="muted">No pending reviews.</div>`;
   }catch(e){$("reviewsList").innerHTML=`<div class="muted">${e.message}</div>`;}}
-let qOffset=0;const qLimit=10;let qTotal=0;let qItems={};
+let qOffset=0;const qLimit=25;let qTotal=0;let qGroups=[];
 async function loadQueries(){
-  try{const p=await api(`/v1/metrics/queries?tenant_id=${tenant()}&limit=${qLimit}&offset=${qOffset}`);
-    qTotal=p.total;
-    qItems={}; p.items.forEach(x=>{qItems[x.id]=x;});
-    $("queriesBody").innerHTML=p.items.length?p.items.map(x=>`<tr class="qrow" onclick="openQueryModal('${x.id}')">
-      <td class="q">${esc(x.query_text)}</td>
-      <td>${badge(x.final_decision)}</td>
-      <td class="muted">${x.policy_profile||'—'}</td>
-      <td class="muted">${x.latency_ms!=null?x.latency_ms+' ms':'—'}</td>
-      <td class="muted">${(x.created_at||'').slice(0,19).replace('T',' ')}</td></tr>`).join("")
+  try{const p=await api(`/v1/metrics/queries/grouped?tenant_id=${tenant()}&limit=${qLimit}&offset=${qOffset}`);
+    qTotal=p.total; qGroups=p.items;
+    $("queriesBody").innerHTML=p.items.length?p.items.map((g,i)=>{
+      const decs={}; (g.run_list||[]).forEach(r=>{decs[r.decision]=(decs[r.decision]||0)+1;});
+      const decCell=Object.entries(decs).map(([d,n])=>`${badge(d)}${n>1?`<span class="muted"> ×${n}</span>`:''}`).join(' ');
+      return `<tr class="qrow" onclick="openQueryModal(${i})">
+        <td class="q">${esc(g.query_text)}</td>
+        <td>${decCell}</td>
+        <td class="muted">${g.policy_profile||'—'}</td>
+        <td class="muted">${g.runs} run${g.runs>1?'s':''}</td>
+        <td class="muted">${(g.last_at||'').slice(0,19).replace('T',' ')}</td></tr>`;
+    }).join("")
       :`<tr><td colspan="5" class="muted">No queries yet.</td></tr>`;
     const from=qTotal?qOffset+1:0,to=Math.min(qOffset+qLimit,qTotal);
     $("q-pageinfo").textContent=`${from}–${to} of ${qTotal}`;
     $("q-prev").disabled=qOffset<=0;$("q-next").disabled=qOffset+qLimit>=qTotal;
   }catch(e){$("queriesBody").innerHTML=`<tr><td colspan="5" class="muted">${e.message}</td></tr>`;}
 }
-async function openQueryModal(id){
+async function openQueryModal(i){
+  const g=qGroups[i]; if(!g)return;
   $("qmodal").hidden=false;
   $("qm-title").textContent="Query detail";
   $("qm-body").innerHTML='<div class="muted">Loading…</div>';
-  const it=qItems[id]||{};
   try{
-    const r=await api(`/v1/query/${id}`);
-    const fr=r.final_response||{};
-    const q=r.query_text||it.query_text||'—';
-    const decision=fr.final_decision||it.final_decision;
-    const profile=it.policy_profile||'—';
-    const latency=(fr.latency_ms!=null?fr.latency_ms:it.latency_ms);
-    const when=(r.created_at||it.created_at||'').slice(0,19).replace('T',' ');
-    const notes=(fr.uncertainty_notes||[]);
-    const cites=(fr.citations||[]).map(c=>`<div class="cite"><b>${esc(c.source_name)}</b>${c.trust_tier?` · tier ${c.trust_tier}`:''}<br>${esc(c.snippet||'')}</div>`).join("")
-      ||'<div class="muted">No citations.</div>';
+    const runs=g.run_list||[];
+    const traces=await Promise.all(runs.map(r=>api(`/v1/query/${r.id}`).catch(()=>null)));
+    const n=runs.length;
+    const blocks=runs.map((run,idx)=>{
+      const fr=(traces[idx]||{}).final_response||{};
+      const when=(run.created_at||'').slice(0,19).replace('T',' ');
+      const cites=(fr.citations||[]).map(c=>`<div class="cite"><b>${esc(c.source_name)}</b>${c.trust_tier?` · tier ${c.trust_tier}`:''}<br>${esc(c.snippet||'')}</div>`).join("")
+        ||'<div class="muted">No citations.</div>';
+      const notes=(fr.uncertainty_notes||[]);
+      return `<div class="qm-run">
+        <div class="qm-run-head">Run ${n-idx} ${badge(fr.final_decision||run.decision)}
+          <span class="muted">${run.latency_ms!=null?run.latency_ms+' ms':''}${when?' · '+when:''}</span></div>
+        <div class="qm-answer">${esc(fr.response_text||fr.refusal_reason||'—')}</div>
+        ${fr.confidence_summary?`<div class="qm-conf">${esc(fr.confidence_summary)}</div>`:''}
+        ${notes.length?notes.map(nt=>`<div class="cite">${esc(nt)}</div>`).join(""):''}
+        <div class="qm-cites-lbl">Citations</div>${cites}
+      </div>`;
+    }).join("");
     $("qm-body").innerHTML=`
       <div class="qm-label">Question</div>
-      <div class="qm-question">${esc(q)}</div>
-      <div class="qm-meta">${badge(decision)}
-        <span>profile: ${esc(profile)}</span>
-        ${latency!=null?`<span>${latency} ms</span>`:''}
-        ${when?`<span>${when}</span>`:''}</div>
-      <div class="qm-label">Answer</div>
-      <div class="qm-answer">${esc(fr.response_text||fr.refusal_reason||'—')}</div>
-      ${fr.confidence_summary?`<div class="qm-conf">${esc(fr.confidence_summary)}</div>`:''}
-      ${notes.length?`<div class="qm-label">Uncertainty notes</div>`+notes.map(n=>`<div class="cite">${esc(n)}</div>`).join(""):''}
-      <div class="qm-label">Citations</div>${cites}`;
+      <div class="qm-question">${esc(g.query_text)}</div>
+      <div class="qm-label">Test runs (${n}) · profile: ${esc(g.policy_profile||'—')}</div>
+      ${blocks}`;
   }catch(e){$("qm-body").innerHTML=`<div class="muted">${e.message}</div>`;}
 }
 function closeQueryModal(){$("qmodal").hidden=true;}

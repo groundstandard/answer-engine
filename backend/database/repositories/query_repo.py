@@ -63,6 +63,35 @@ class QueryRepository:
         )
         return [dict(r._mapping) for r in result.fetchall()]
 
+    async def list_grouped_for_tenant(self, tenant_id: UUID, limit: int, offset: int) -> list[dict]:
+        """One entry per distinct question, with every run collapsed into run_list."""
+        result = await self.db.execute(
+            text("""
+                SELECT query_text,
+                       COUNT(*) AS runs,
+                       MAX(created_at) AS last_at,
+                       (ARRAY_AGG(policy_profile ORDER BY created_at DESC))[1] AS policy_profile,
+                       JSON_AGG(JSON_BUILD_OBJECT(
+                           'id', id, 'decision', final_decision,
+                           'latency_ms', latency_ms, 'created_at', created_at
+                       ) ORDER BY created_at DESC) AS run_list
+                FROM query_logs
+                WHERE tenant_id = :tid
+                GROUP BY query_text
+                ORDER BY MAX(created_at) DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            {"tid": str(tenant_id), "limit": limit, "offset": offset},
+        )
+        return [dict(r._mapping) for r in result.fetchall()]
+
+    async def count_distinct_for_tenant(self, tenant_id: UUID) -> int:
+        result = await self.db.execute(
+            text("SELECT COUNT(DISTINCT query_text) FROM query_logs WHERE tenant_id = :tid"),
+            {"tid": str(tenant_id)},
+        )
+        return int(result.scalar() or 0)
+
     async def count_for_tenant(self, tenant_id: UUID) -> int:
         result = await self.db.execute(
             text("SELECT COUNT(*) FROM query_logs WHERE tenant_id = :tid"),
