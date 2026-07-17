@@ -74,6 +74,10 @@ class ResponseComposer:
 
     def _refusal_message(self, decision: PolicyDecision) -> str:
         codes = decision.reason_codes
+        if "NO_ANSWER_IN_EVIDENCE" in codes:
+            return "I don't have a source that answers this question, so I can't provide a verified answer."
+        if "UNVERIFIABLE_QUERY" in codes:
+            return "This question can't be answered from verifiable evidence — it calls for a prediction, opinion, or fact no source can confirm."
         if "INSUFFICIENT_EVIDENCE_COUNT" in codes:
             return "I could not find enough reliable sources to answer this question."
         if "CRITICAL_CLAIM_UNSUPPORTED" in codes:

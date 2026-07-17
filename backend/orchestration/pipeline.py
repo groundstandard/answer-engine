@@ -2,8 +2,24 @@ import time
 from uuid import uuid4, UUID
 from typing import Optional, List
 from backend.models.response import FinalResponse
-from backend.models.policy import PolicyConfig
+from backend.models.policy import PolicyConfig, PolicyDecision, PolicyDecisionType
 from backend.config.settings import settings
+
+# When the model's own draft declines to answer from the evidence, the answer is
+# a non-answer — it must be gated as REFUSED, never VERIFIED. These markers catch
+# that abstention so a "the evidence doesn't cover this" reply can't be labeled
+# as a verified answer (the audit-trail failure Bobby flagged).
+_ABSTENTION_MARKERS = (
+    "does not contain", "do not contain",
+    "does not include any information", "not include any information",
+    "does not mention", "does not address", "does not specify",
+    "does not provide information", "do not provide information",
+    "no information regarding", "no information about", "no information on",
+    "could not find", "cannot find", "can't find",
+    "unable to answer", "cannot answer", "can't answer",
+    "no relevant evidence", "not enough information", "insufficient information",
+    "evidence provided does not", "evidence does not", "no evidence",
+)
 
 
 class PipelineController:
@@ -60,8 +76,22 @@ class PipelineController:
         # Cost routing: cheaper model for low-risk generation tasks.
         self._apply_cost_routing(classification)
 
-        # Short-circuit for non-factual queries
-        if classification.classification_label in ("CREATIVE", "UNVERIFIABLE"):
+        # Unverifiable queries (predictions, opinions, unknowable facts) can never
+        # be evidence-backed — refuse, don't qualify. This is what a legal/medical
+        # buyer expects: no answer to "will the Supreme Court…" or "which judge is…".
+        if classification.classification_label == "UNVERIFIABLE":
+            return FinalResponse(
+                query_id=uuid4(),
+                final_decision="REFUSED",
+                response_text="This question can't be answered from verifiable evidence — it calls for a prediction, opinion, or fact no source can confirm.",
+                confidence_summary="Unverifiable query — no evidence-based answer possible.",
+                refusal_reason="UNVERIFIABLE_QUERY",
+                uncertainty_notes=["Not answerable from evidence."],
+                trace_id=trace_id,
+                latency_ms=int((time.monotonic() - pipeline_start) * 1000),
+            )
+        # Creative/non-factual requests simply don't need verification.
+        if classification.classification_label == "CREATIVE":
             return FinalResponse(
                 query_id=uuid4(),
                 final_decision="QUALIFIED",
@@ -123,6 +153,25 @@ class PipelineController:
             evidence_bundle=evidence_bundle,
             policy_config=policy_config,
         )
+
+        # Abstention guard: if the drafted answer itself declines to answer from
+        # the evidence (e.g. "the evidence does not contain information on this
+        # case"), that is NOT a verified answer — force a refusal. Fixes the
+        # fabricated-case bait and "no info but marked VERIFIED" failures.
+        if (
+            policy_decision.decision in (
+                PolicyDecisionType.ANSWER_VERIFIED,
+                PolicyDecisionType.ANSWER_QUALIFIED,
+            )
+            and self._is_abstention(draft_answer)
+        ):
+            policy_decision = PolicyDecision(
+                decision=PolicyDecisionType.REFUSE_INSUFFICIENT_EVIDENCE,
+                reason_codes=(policy_decision.reason_codes or []) + ["NO_ANSWER_IN_EVIDENCE"],
+                allowed_response_type="NONE",
+                escalation_required=False,
+                confidence_summary="The evidence does not answer the question.",
+            )
         await self._emit(on_event, "policy", {"decision": policy_decision.decision.value})
 
         # Stage 6: Response Composition
@@ -142,6 +191,14 @@ class PipelineController:
     async def _emit(on_event, stage: str, data: dict) -> None:
         if on_event is not None:
             await on_event(stage, data)
+
+    @staticmethod
+    def _is_abstention(draft_answer: str) -> bool:
+        """True when the drafted answer declines to answer from the evidence."""
+        if not draft_answer:
+            return True
+        text = draft_answer.lower()
+        return any(marker in text for marker in _ABSTENTION_MARKERS)
 
     def _apply_cost_routing(self, classification) -> None:
         """Route generation tasks to the cheaper model when the query is low-risk.
