@@ -33,6 +33,21 @@ _CONTEXT_DEPENDENT_MARKERS = (
     "all-party consent",
 )
 
+# Naming two or more different states in one answer is a strong sign the result
+# is jurisdiction-dependent (e.g. "in California… in New York…") even when the
+# model drops the "varies by state" wording.
+_US_STATES = frozenset({
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+    "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+    "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine",
+    "maryland", "massachusetts", "michigan", "minnesota", "mississippi",
+    "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey",
+    "new mexico", "new york", "north carolina", "north dakota", "ohio",
+    "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina",
+    "south dakota", "tennessee", "texas", "utah", "vermont", "virginia",
+    "washington", "west virginia", "wisconsin", "wyoming",
+})
+
 
 class PipelineController:
     """
@@ -184,19 +199,11 @@ class PipelineController:
                 escalation_required=False,
                 confidence_summary="The evidence does not answer the question.",
             )
-        # Jurisdiction/context guard: if the answer or its supporting evidence says
-        # the result varies by state / depends on jurisdiction, a flat VERIFIED
-        # overstates confidence — qualify it. Checking the evidence text (our own
-        # indexed sources) is deterministic, unlike the model's phrasing.
+        # Jurisdiction/context guard: a verified answer that varies by state or
+        # depends on unspecified jurisdiction should be QUALIFIED, not VERIFIED.
         elif (
             policy_decision.decision == PolicyDecisionType.ANSWER_VERIFIED
-            and (
-                self._depends_on_context(draft_answer)
-                or any(
-                    self._depends_on_context(getattr(e, "content", ""))
-                    for e in evidence_bundle.evidence_items
-                )
-            )
+            and self._depends_on_context(draft_answer)
         ):
             policy_decision = PolicyDecision(
                 decision=PolicyDecisionType.ANSWER_QUALIFIED,
@@ -243,11 +250,21 @@ class PipelineController:
 
     @staticmethod
     def _depends_on_context(draft_answer) -> bool:
-        """True when the answer itself says the result varies by jurisdiction/state."""
+        """True when the answer varies by jurisdiction/state — either via explicit
+        variance wording, or by naming two or more different states."""
         if not draft_answer:
             return False
         text = (draft_answer if isinstance(draft_answer, str) else str(draft_answer)).lower()
-        return any(marker in text for marker in _CONTEXT_DEPENDENT_MARKERS)
+        if any(marker in text for marker in _CONTEXT_DEPENDENT_MARKERS):
+            return True
+        # Count distinct states, removing each match so overlapping names
+        # (e.g. "arkansas"⊃"kansas", "west virginia"⊃"virginia") aren't double-counted.
+        count = 0
+        for state in sorted(_US_STATES, key=len, reverse=True):
+            if state in text:
+                count += 1
+                text = text.replace(state, " ")
+        return count >= 2
 
     def _apply_cost_routing(self, classification) -> None:
         """Route generation tasks to the cheaper model when the query is low-risk.
