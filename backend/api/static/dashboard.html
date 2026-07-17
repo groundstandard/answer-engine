@@ -83,10 +83,21 @@
   .tbl tr:last-child td{border-bottom:none;}
   .tbl td.q{max-width:560px;font-weight:600;}
   .qrow{cursor:pointer;} .qrow:hover{background:#F7F8FC;}
-  .caret{display:inline-block;transition:.15s;color:var(--muted);margin-right:7px;font-size:11px;}
-  .caret.open{transform:rotate(90deg);}
-  .qdetail>td{background:#FBFCFE;padding:2px 12px 15px;}
-  .qd-answer{line-height:1.55;font-size:13px;padding:9px 0;color:var(--ink);}
+  /* query detail modal */
+  .qmodal-overlay{position:fixed;inset:0;background:rgba(18,13,66,.45);display:flex;align-items:center;
+        justify-content:center;z-index:120;backdrop-filter:blur(2px);padding:20px;}
+  .qmodal-overlay[hidden]{display:none;}
+  .qmodal{background:#fff;border-radius:16px;width:min(720px,94vw);max-height:86vh;display:flex;
+        flex-direction:column;box-shadow:0 24px 70px rgba(18,13,66,.32);animation:pop .16s ease;overflow:hidden;}
+  .qmodal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+        padding:18px 22px;border-bottom:1px solid var(--line);}
+  .qmodal-title{font-size:15px;font-weight:800;color:var(--navy);line-height:1.35;}
+  .qmodal-x{background:none;color:var(--muted);border:0;font-size:24px;line-height:1;cursor:pointer;padding:0 2px;}
+  .qmodal-x:hover{color:var(--ink);background:none;}
+  .qmodal-body{padding:18px 22px;overflow-y:auto;}
+  .qm-meta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;font-size:12px;color:var(--muted);margin:2px 0 16px;}
+  .qm-answer{line-height:1.6;font-size:14px;color:var(--ink);}
+  .qm-cites-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:20px 0 9px;}
   .pager{display:flex;align-items:center;gap:12px;margin-top:15px;}
   .pager button[disabled]{opacity:.4;cursor:not-allowed;}
   .sel{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;background:#fff;color:var(--ink);}
@@ -331,6 +342,15 @@
     </div>
   </div>
 </div>
+<div id="qmodal" class="qmodal-overlay" hidden>
+  <div class="qmodal">
+    <div class="qmodal-head">
+      <div class="qmodal-title" id="qm-title">Query</div>
+      <button class="qmodal-x" id="qm-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="qmodal-body" id="qm-body"></div>
+  </div>
+</div>
 <div id="toast" class="toast"></div>
 
 <script>
@@ -359,6 +379,10 @@ function showView(t){
   if(t==='keys')loadKeys();
 }
 document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>showView(a.dataset.t));
+// Query-detail modal close: X button, click on backdrop, or Escape.
+$("qm-close").onclick=closeQueryModal;
+$("qmodal").addEventListener('click',e=>{ if(e.target===$("qmodal"))closeQueryModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$("qmodal").hidden)closeQueryModal(); });
 // Auth (used only when the server runs with AUTH_REQUIRED=true).
 function authHeaders(){const t=(localStorage.getItem('ae_token')||'').trim();
   if(!t)return{}; return t.startsWith('ae_')?{'X-API-Key':t}:{'Authorization':'Bearer '+t};}
@@ -423,38 +447,38 @@ let qOffset=0;const qLimit=10;let qTotal=0;
 async function loadQueries(){
   try{const p=await api(`/v1/metrics/queries?tenant_id=${tenant()}&limit=${qLimit}&offset=${qOffset}`);
     qTotal=p.total;
-    $("queriesBody").innerHTML=p.items.length?p.items.map(x=>`<tr class="qrow" onclick="toggleQ('${x.id}',this)">
-      <td class="q"><span class="caret">▸</span>${esc(x.query_text)}</td>
+    $("queriesBody").innerHTML=p.items.length?p.items.map(x=>`<tr class="qrow" onclick="openQueryModal('${x.id}')">
+      <td class="q">${esc(x.query_text)}</td>
       <td>${badge(x.final_decision)}</td>
       <td class="muted">${x.policy_profile||'—'}</td>
       <td class="muted">${x.latency_ms!=null?x.latency_ms+' ms':'—'}</td>
-      <td class="muted">${(x.created_at||'').slice(0,19).replace('T',' ')}</td></tr>
-      <tr class="qdetail" id="qd-${x.id}" hidden><td colspan="5"><div class="qd-inner muted">Loading…</div></td></tr>`).join("")
+      <td class="muted">${(x.created_at||'').slice(0,19).replace('T',' ')}</td></tr>`).join("")
       :`<tr><td colspan="5" class="muted">No queries yet.</td></tr>`;
     const from=qTotal?qOffset+1:0,to=Math.min(qOffset+qLimit,qTotal);
     $("q-pageinfo").textContent=`${from}–${to} of ${qTotal}`;
     $("q-prev").disabled=qOffset<=0;$("q-next").disabled=qOffset+qLimit>=qTotal;
   }catch(e){$("queriesBody").innerHTML=`<tr><td colspan="5" class="muted">${e.message}</td></tr>`;}
 }
-function toggleQ(id,rowEl){
-  const d=$("qd-"+id); if(!d)return;
-  const caret=rowEl.querySelector('.caret');
-  if(d.hidden){ d.hidden=false; if(caret)caret.classList.add('open');
-    if(!d.dataset.loaded)loadQueryDetail(id); }
-  else { d.hidden=true; if(caret)caret.classList.remove('open'); }
-}
-async function loadQueryDetail(id){
-  const d=$("qd-"+id); const cell=d.querySelector('.qd-inner');
+async function openQueryModal(id){
+  $("qmodal").hidden=false;
+  $("qm-title").textContent="Loading…";
+  $("qm-body").innerHTML='<div class="muted">Loading…</div>';
   try{
     const r=await api(`/v1/query/${id}`);
     const fr=r.final_response||{};
+    const when=(r.created_at||'').slice(0,19).replace('T',' ');
     const cites=(fr.citations||[]).map(c=>`<div class="cite">${esc(c.source_name)}: ${esc(c.snippet||'')}</div>`).join("")
-      ||`<div class="muted" style="margin-top:8px">No citations.</div>`;
-    cell.className="";
-    cell.innerHTML=`<div class="qd-answer">${badge(fr.final_decision)} <span style="margin-left:6px">${esc(fr.response_text||fr.refusal_reason||'—')}</span></div>${cites}`;
-    d.dataset.loaded="1";
-  }catch(e){cell.innerHTML=`<span class="muted">${e.message}</span>`;}
+      ||'<div class="muted">No citations.</div>';
+    $("qm-title").textContent=r.query_text||"Query";
+    $("qm-body").innerHTML=`
+      <div class="qm-meta">${badge(fr.final_decision)}
+        ${fr.confidence_summary?`<span>${esc(fr.confidence_summary)}</span>`:''}
+        <span>${when}</span></div>
+      <div class="qm-answer">${esc(fr.response_text||fr.refusal_reason||'—')}</div>
+      <div class="qm-cites-title">Citations</div>${cites}`;
+  }catch(e){$("qm-body").innerHTML=`<div class="muted">${e.message}</div>`;}
 }
+function closeQueryModal(){$("qmodal").hidden=true;}
 function queriesPage(dir){qOffset=Math.max(0,qOffset+dir*qLimit);loadQueries();}
 function showBusy(m){$("busyMsg").textContent=m||"Working…";$("busy").hidden=false;}
 function hideBusy(){$("busy").hidden=true;}
@@ -563,7 +587,7 @@ function startAuto(){
     const t=active?active.dataset.t:'overview';
     if(t==='sources')loadSources();
     else if(t==='reviews')loadReviews();
-    else if(t==='queries' && !document.querySelector('.qdetail:not([hidden])'))loadQueries();
+    else if(t==='queries' && $("qmodal").hidden)loadQueries();
     else if(t==='keys')loadKeys();
   }, 7000);
 }
