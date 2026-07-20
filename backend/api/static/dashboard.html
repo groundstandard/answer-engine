@@ -238,7 +238,7 @@
         <h2>Ask console</h2>
         <div class="desc">Run a question through the full evidence-gated pipeline — watch each gate live.</div>
         <div class="chips" id="chips"></div>
-        <textarea id="q" rows="3" placeholder="e.g. What is the first rank in Brazilian Jiu-Jitsu?"></textarea>
+        <textarea id="q" rows="3" placeholder="e.g. What are the elements of negligence under common law?"></textarea>
         <div class="row" style="margin-top:11px"><button id="askBtn" onclick="ask()">Submit query</button></div>
         <div id="steps"></div>
         <div id="answer"></div>
@@ -560,8 +560,8 @@ async function resolve(id,status){try{await api(`/v1/admin/reviews/${id}/resolve
   headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});toast("Review "+status,"ok");loadReviews();}catch(e){toast(e.message,"err");}}
 const STEPS=[["classification","Classify"],["retrieval","Retrieve"],["claims","Extract claims"],
              ["verification","Verify"],["policy","Policy"],["final","Answer"]];
-const SUGGESTIONS=["What is the first rank in Brazilian Jiu-Jitsu?","How long does it take to earn a BJJ black belt?",
-                   "What does Brazilian Jiu-Jitsu focus on?","What is the capital of France?"];
+const SUGGESTIONS=["What are the elements of negligence under common law?","Summarize the holding in Varghese v. China Southern Airlines.",
+                   "How long do I have to file a personal injury lawsuit?","What's the settlement value of my slip-and-fall case?"];
 function renderChips(){$("chips").innerHTML=SUGGESTIONS.map(s=>`<span class="chip" onclick="pickChip(this)">${s}</span>`).join("");}
 function pickChip(el){$("q").value=el.textContent;$("q").focus();}
 function renderSteps(state){$("steps").innerHTML=STEPS.map(([k,l])=>{
